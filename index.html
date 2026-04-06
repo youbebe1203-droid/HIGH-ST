@@ -2758,8 +2758,34 @@
 
         function SettingsView({ currentUser, userRole, theme, suneungDate, getDDay, onThemeChange, onRoleChange, onSuneungChange, onSchoolChange }) {
             const [school, setSchool] = useState(currentUser.school || '');
-            const [saved, setSaved] = useState(false);
+            const [saved,  setSaved]  = useState(false);
             const saveSchool = async () => { await onSchoolChange(school); setSaved(true); setTimeout(()=>setSaved(false), 2000); };
+
+            // 선생님 인증 모달
+            const [roleModal,     setRoleModal]     = useState(false);  // 모달 표시 여부
+            const [rolePw,        setRolePw]        = useState('');
+            const [rolePwError,   setRolePwError]   = useState(false);
+            const [pendingRole,   setPendingRole]   = useState(null);   // 클릭한 역할
+
+            const handleRoleClick = (r) => {
+                if (r.id === userRole) return;           // 이미 현재 역할
+                if (r.id === '학생') { onRoleChange('학생'); return; }  // 학생은 자유
+                if (r.id === '관리자') return;            // 관리자는 코드로만 부여
+                // 선생님 → 모달
+                setPendingRole(r.id);
+                setRolePw('');
+                setRolePwError(false);
+                setRoleModal(true);
+            };
+
+            const confirmRolePw = async () => {
+                if (rolePw === 'sunkist0313') {
+                    await onRoleChange(pendingRole);
+                    setRoleModal(false);
+                } else {
+                    setRolePwError(true);
+                }
+            };
 
             const THEMES = [{id:'light', icon:'☀️', label:'Light'},{id:'dark',icon:'🌙',label:'Dark'},{id:'midnight',icon:'🌑',label:'Midnight'}];
             const ROLES  = [{id:'학생',icon:'🎓'},{id:'선생님',icon:'👨‍🏫'},{id:'관리자',icon:'👑'}];
@@ -2795,13 +2821,27 @@
                         {/* 역할 */}
                         <SettingsSection label="Access Role">
                             <div style={{display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'8px'}}>
-                                {ROLES.map(r => (
-                                    <button key={r.id} onClick={() => onRoleChange(r.id)}
-                                        style={{padding:'14px', borderRadius:'18px', border: userRole===r.id ? '2px solid var(--accent)' : '1.5px solid var(--glass-border)', background: userRole===r.id ? 'rgba(79,110,247,0.12)' : 'var(--glass-bg2)', cursor:'pointer', transition:'all 0.2s', fontFamily:'Pretendard, sans-serif', fontWeight:800, fontSize:'12px', color: userRole===r.id ? 'var(--accent)' : 'var(--text-sub)', display:'flex', flexDirection:'column', alignItems:'center', gap:'6px'}}>
-                                        <span style={{fontSize:'20px'}}>{r.icon}</span>
-                                        {r.id}
-                                    </button>
-                                ))}
+                                {ROLES.map(r => {
+                                    const isActive  = userRole === r.id;
+                                    const isLocked  = r.id === '관리자' && userRole !== '관리자';
+                                    return (
+                                        <button key={r.id} onClick={() => handleRoleClick(r)}
+                                            disabled={isLocked}
+                                            style={{padding:'14px', borderRadius:'18px',
+                                                border: isActive ? '2px solid var(--accent)' : '1.5px solid var(--glass-border)',
+                                                background: isActive ? 'rgba(79,110,247,0.12)' : 'var(--glass-bg2)',
+                                                cursor: isLocked ? 'not-allowed' : 'pointer',
+                                                opacity: isLocked ? 0.35 : 1,
+                                                transition:'all 0.2s', fontFamily:'Pretendard, sans-serif',
+                                                fontWeight:800, fontSize:'12px',
+                                                color: isActive ? 'var(--accent)' : 'var(--text-sub)',
+                                                display:'flex', flexDirection:'column', alignItems:'center', gap:'6px'}}>
+                                            <span style={{fontSize:'20px'}}>{r.icon}</span>
+                                            {r.id}
+                                            {r.id === '선생님' && !isActive && <span style={{fontSize:'9px', opacity:0.5}}>🔒 코드 필요</span>}
+                                        </button>
+                                    );
+                                })}
                             </div>
                         </SettingsSection>
 
@@ -2811,6 +2851,40 @@
                             <p style={{fontSize:'12px', fontWeight:800, color:'var(--accent)', marginTop:'10px', opacity:0.8}}>현재: {getDDay(suneungDate)}</p>
                         </SettingsSection>
                     </div>
+
+                    {/* 선생님 인증 모달 */}
+                    {roleModal && (
+                        <div style={{position:'fixed', inset:0, zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.55)', backdropFilter:'blur(6px)'}}
+                            onClick={()=>setRoleModal(false)}>
+                            <div className="glass-card-lg" style={{padding:'32px 36px', width:'100%', maxWidth:'360px', textAlign:'center'}}
+                                onClick={e=>e.stopPropagation()}>
+                                <div style={{fontSize:'32px', marginBottom:'12px'}}>👨‍🏫</div>
+                                <h3 style={{fontSize:'16px', fontWeight:900, color:'var(--text)', marginBottom:'6px'}}>선생님 인증</h3>
+                                <p style={{fontSize:'12px', fontWeight:600, opacity:0.45, color:'var(--text)', marginBottom:'24px'}}>교사 인증 코드를 입력해 주세요</p>
+                                <input
+                                    type="password"
+                                    value={rolePw}
+                                    onChange={e=>{ setRolePw(e.target.value); setRolePwError(false); }}
+                                    onKeyDown={e=>{ if(e.key==='Enter') confirmRolePw(); }}
+                                    placeholder="인증 코드"
+                                    autoFocus
+                                    style={{width:'100%', textAlign:'center', fontSize:'16px', fontWeight:800, letterSpacing:'0.2em',
+                                        borderColor: rolePwError ? '#ef4444' : undefined,
+                                        boxShadow: rolePwError ? '0 0 0 3px rgba(239,68,68,0.15)' : undefined}}
+                                />
+                                {rolePwError && <p style={{fontSize:'11px', fontWeight:800, color:'#ef4444', marginTop:'8px'}}>코드가 올바르지 않습니다</p>}
+                                <div style={{display:'flex', gap:'10px', marginTop:'20px'}}>
+                                    <button onClick={()=>setRoleModal(false)}
+                                        style={{flex:1, padding:'12px', borderRadius:'14px', border:'1.5px solid var(--glass-border)', background:'var(--glass-bg2)', cursor:'pointer', fontSize:'13px', fontWeight:800, color:'var(--text-sub)', fontFamily:'Pretendard,sans-serif'}}>
+                                        취소
+                                    </button>
+                                    <button onClick={confirmRolePw} className="btn-primary" style={{flex:1, padding:'12px'}}>
+                                        확인
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             );
         }
