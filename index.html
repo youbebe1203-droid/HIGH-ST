@@ -93,6 +93,76 @@
             overflow: hidden;
         }
 
+        /* ── 모바일 / 태블릿 레이아웃 ───────────────────────── */
+        .mobile-header {
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 16px;
+            background: var(--glass-bg);
+            backdrop-filter: blur(24px) saturate(180%);
+            -webkit-backdrop-filter: blur(24px) saturate(180%);
+            border-bottom: 1px solid var(--glass-border);
+            position: sticky;
+            top: 0;
+            z-index: 50;
+        }
+        .mobile-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px 16px 88px;
+            -webkit-overflow-scrolling: touch;
+        }
+        .mobile-bottom-nav {
+            position: fixed;
+            bottom: 0; left: 0; right: 0;
+            height: 62px;
+            background: var(--glass-bg);
+            backdrop-filter: blur(28px) saturate(200%);
+            -webkit-backdrop-filter: blur(28px) saturate(200%);
+            border-top: 1px solid var(--glass-border);
+            display: flex;
+            z-index: 100;
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+        .mobile-tab {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 3px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: var(--text-sub);
+            font-family: 'Pretendard', sans-serif;
+            transition: all 0.15s;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .mobile-tab.active { color: var(--accent); }
+        .mobile-tab .tab-icon { font-size: 21px; line-height: 1; }
+        .mobile-tab .tab-label { font-size: 9px; font-weight: 800; opacity: 0.55; letter-spacing: 0.02em; }
+        .mobile-tab.active .tab-label { opacity: 1; }
+        .mobile-more-drawer {
+            position: fixed;
+            bottom: 62px; left: 0; right: 0;
+            background: var(--glass-bg);
+            backdrop-filter: blur(32px) saturate(200%);
+            -webkit-backdrop-filter: blur(32px) saturate(200%);
+            border-top: 1px solid var(--glass-border);
+            z-index: 99;
+            padding: 16px;
+            animation: fadeInUp 0.18s ease both;
+        }
+
+        /* 모바일에서 카드 패딩 축소 */
+        @media (max-width: 767px) {
+            .glass-card-lg { padding: 18px 16px !important; border-radius: 20px !important; }
+            .glass-card    { padding: 14px 16px !important; border-radius: 18px !important; }
+        }
+
         /* ── 키프레임 ──────────────────────────────────────── */
         @keyframes fadeInUp {
             from { opacity: 0; transform: translateY(20px); }
@@ -543,6 +613,16 @@
             }, [theme]);
 
             const [needsSetup, setNeedsSetup] = useState(null); // { uid, googleName }
+            const [showMore,   setShowMore]   = useState(false);
+
+            // 디바이스 감지
+            const [winW, setWinW] = useState(window.innerWidth);
+            useEffect(() => {
+                const h = () => setWinW(window.innerWidth);
+                window.addEventListener('resize', h);
+                return () => window.removeEventListener('resize', h);
+            }, []);
+            const isMobileUI = winW < 1100; // 모바일 + 태블릿
 
             // Firebase Auth 상태 감지
             useEffect(() => {
@@ -945,6 +1025,95 @@
 
             const canManageSystem = userRole === '선생님' || userRole === '관리자';
 
+            // ── 공통 뷰 렌더러 ──────────────────────────────────────────────
+            const renderView = () => (<>
+                {view === '대시보드' && <Dashboard announcements={announcements} todos={todos} resources={resources} posts={posts} studyTime={studyTime} suneungDate={suneungDate} getDDay={getDDay} setView={setView} />}
+                {view === '학습'     && <StudyView currentUser={currentUser} studyGroups={studyGroups} studyTime={studyTime} suneungDate={suneungDate} getDDay={getDDay} todos={todos} selectedDate={selectedDate} setSelectedDate={setSelectedDate} onAddTodo={handleAddTodo} onToggleTodo={handleToggleTodo} onDeleteTodo={handleDeleteTodo} onStudyStart={handleStudyStart} onStudyStop={handleStudyStop} onCreateGroup={handleCreateStudyGroup} onJoinGroup={handleJoinStudyGroup} onLeaveGroup={handleLeaveStudyGroup} />}
+                {view === '플래너'   && <Planner todos={todos} selectedDate={selectedDate} setSelectedDate={setSelectedDate} onAdd={handleAddTodo} onToggle={handleToggleTodo} onDelete={handleDeleteTodo} />}
+                {view === '공지사항' && <NoticeView isAdmin={canManageSystem} announcements={announcements} onAdd={handleAddAnnouncement} />}
+                {view === '커뮤니티' && <CommunityView posts={posts} currentUser={currentUser} onAddPost={handleAddPost} />}
+                {view === '공용달력' && <CalendarView isAdmin={canManageSystem} sharedEvents={sharedEvents} onAddEvent={handleAddEvent} onDeleteEvent={handleDeleteEvent} />}
+                {view === '자료실'   && <ResourceView resources={resources} currentUser={currentUser} onAdd={handleAddResource} />}
+                {view === '메시지'   && <MessageView rooms={rooms} currentUser={currentUser} localRoomMessages={localRoomMessages} onCreateRoom={handleCreateRoom} onSendInRoom={handleSendInRoom} />}
+                {view === '설정'     && <SettingsView currentUser={currentUser} userRole={userRole} theme={theme} suneungDate={suneungDate} getDDay={getDDay} onThemeChange={async (t) => { setTheme(t); await saveProfile({ theme: t }); }} onRoleChange={async (r) => { setUserRole(r); await saveProfile({ role: r }); }} onSuneungChange={async (d) => { setSuneungDate(d); await saveProfile({ suneungDate: d }); }} onSchoolChange={async (s) => await saveProfile({ school: s })} onNameChange={async (n) => { await saveProfile({ name: n }); }} />}
+            </>);
+
+            const goView = (v) => { setView(v); setShowMore(false); };
+            const NAV_PRIMARY = [['대시보드','🏠','홈'],['학습','⏱️','학습'],['플래너','📅','플래너'],['메시지','💬','메시지']];
+            const NAV_MORE    = [['공지사항','📢','공지'],['커뮤니티','🔥','커뮤니티'],['공용달력','🗓️','달력'],['자료실','📚','자료실'],['설정','⚙️','설정']];
+
+            // ── 모바일 / 태블릿 레이아웃 ────────────────────────────────────
+            if (isMobileUI) return (
+                <div style={{display:'flex', flexDirection:'column', height:'100dvh', width:'100vw', overflow:'hidden'}}>
+                    <header className="mobile-header">
+                        <div style={{fontSize:'20px', fontWeight:900, letterSpacing:'-0.5px', color:'var(--text)'}}>
+                            HIGH.<span style={{color:'var(--accent)'}}>ST</span>
+                        </div>
+                        <div style={{display:'flex', alignItems:'center', gap:'10px'}}>
+                            <div style={{textAlign:'right'}}>
+                                <div style={{fontSize:'12px', fontWeight:900, color:'var(--accent)'}}>{getDDay(suneungDate)}</div>
+                                <div style={{fontSize:'9px', fontWeight:700, opacity:0.35}}>수능까지</div>
+                            </div>
+                            <div style={{width:'34px', height:'34px', borderRadius:'11px', background:'linear-gradient(135deg, var(--accent), var(--accent2))', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'16px'}}>🎓</div>
+                            <button onClick={handleLogout} style={{fontSize:'11px', fontWeight:800, color:'var(--text-sub)', opacity:0.4, background:'none', border:'none', cursor:'pointer', fontFamily:'Pretendard,sans-serif', padding:'4px'}}>나가기</button>
+                        </div>
+                    </header>
+
+                    <div className="mobile-content">{renderView()}</div>
+
+                    {/* 더보기 드로어 */}
+                    {showMore && (<>
+                        <div style={{position:'fixed', inset:0, zIndex:98}} onClick={()=>setShowMore(false)} />
+                        <div className="mobile-more-drawer">
+                            <div style={{display:'grid', gridTemplateColumns:'repeat(5,1fr)', gap:'8px', marginBottom:'12px'}}>
+                                {NAV_MORE.map(([v,ic,lb]) => (
+                                    <button key={v} onClick={()=>goView(v)}
+                                        style={{display:'flex', flexDirection:'column', alignItems:'center', gap:'5px', padding:'12px 4px', borderRadius:'16px',
+                                            background: view===v ? 'rgba(79,110,247,0.15)' : 'var(--glass-bg2)',
+                                            border: view===v ? '1.5px solid rgba(79,110,247,0.4)' : '1px solid var(--glass-border)',
+                                            cursor:'pointer', fontFamily:'Pretendard,sans-serif',
+                                            color: view===v ? 'var(--accent)' : 'var(--text-sub)',
+                                            WebkitTapHighlightColor:'transparent'}}>
+                                        <span style={{fontSize:'22px'}}>{ic}</span>
+                                        <span style={{fontSize:'9px', fontWeight:800}}>{lb}</span>
+                                    </button>
+                                ))}
+                            </div>
+                            {/* 유저 카드 + 오늘 공부 */}
+                            <div style={{padding:'12px 14px', borderRadius:'14px', background:'var(--glass-bg2)', border:'1px solid var(--glass-border)', display:'flex', alignItems:'center', justifyContent:'space-between'}}>
+                                <div style={{display:'flex', alignItems:'center', gap:'10px'}}>
+                                    <div style={{width:'32px', height:'32px', borderRadius:'10px', background:'linear-gradient(135deg, var(--accent), var(--accent2))', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'14px'}}>🎓</div>
+                                    <div>
+                                        <div style={{fontSize:'13px', fontWeight:800, color:'var(--text)'}}>{currentUser.name}</div>
+                                        <div style={{fontSize:'9px', fontWeight:700, opacity:0.4}}>{currentUser.school}</div>
+                                    </div>
+                                </div>
+                                <div style={{textAlign:'right'}}>
+                                    <div style={{fontSize:'9px', fontWeight:800, color:'var(--accent)', opacity:0.7, textTransform:'uppercase', letterSpacing:'0.1em'}}>Today</div>
+                                    <div style={{fontSize:'18px', fontWeight:900, color:'var(--text)', letterSpacing:'-0.5px'}}>
+                                        {Math.floor(studyTime/3600).toString().padStart(2,'0')}:{Math.floor((studyTime%3600)/60).toString().padStart(2,'0')}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </>)}
+
+                    <nav className="mobile-bottom-nav">
+                        {NAV_PRIMARY.map(([v,ic,lb]) => (
+                            <button key={v} className={`mobile-tab${view===v&&!showMore?' active':''}`} onClick={()=>goView(v)}>
+                                <span className="tab-icon">{ic}</span>
+                                <span className="tab-label">{lb}</span>
+                            </button>
+                        ))}
+                        <button className={`mobile-tab${showMore?' active':''}`} onClick={()=>setShowMore(m=>!m)}>
+                            <span className="tab-icon" style={{fontSize:'18px', fontWeight:900}}>☰</span>
+                            <span className="tab-label">더보기</span>
+                        </button>
+                    </nav>
+                </div>
+            );
+
+            // ── 데스크탑 레이아웃 ────────────────────────────────────────────
             return (
                 <div style={{display:'flex', height:'100vh', width:'100vw', overflow:'hidden'}}>
                     {/* ── 사이드바 ─────────────────────────────────────── */}
@@ -1016,100 +1185,7 @@
                         </header>
 
                         <div style={{padding:'28px 36px 48px', flex:1}}>
-                            {view === '대시보드' && (
-                                <Dashboard
-                                    announcements={announcements}
-                                    todos={todos}
-                                    resources={resources}
-                                    posts={posts}
-                                    studyTime={studyTime}
-                                    suneungDate={suneungDate}
-                                    getDDay={getDDay}
-                                    setView={setView}
-                                />
-                            )}
-                            {view === '학습' && (
-                                <StudyView
-                                    currentUser={currentUser}
-                                    studyGroups={studyGroups}
-                                    studyTime={studyTime}
-                                    suneungDate={suneungDate}
-                                    getDDay={getDDay}
-                                    todos={todos}
-                                    selectedDate={selectedDate}
-                                    setSelectedDate={setSelectedDate}
-                                    onAddTodo={handleAddTodo}
-                                    onToggleTodo={handleToggleTodo}
-                                    onDeleteTodo={handleDeleteTodo}
-                                    onStudyStart={handleStudyStart}
-                                    onStudyStop={handleStudyStop}
-                                    onCreateGroup={handleCreateStudyGroup}
-                                    onJoinGroup={handleJoinStudyGroup}
-                                    onLeaveGroup={handleLeaveStudyGroup}
-                                />
-                            )}
-                            {view === '커뮤니티' && (
-                                <CommunityView
-                                    posts={posts}
-                                    currentUser={currentUser}
-                                    onAddPost={handleAddPost}
-                                />
-                            )}
-                            {view === '공지사항' && (
-                                <NoticeView
-                                    isAdmin={canManageSystem}
-                                    announcements={announcements}
-                                    onAdd={handleAddAnnouncement}
-                                />
-                            )}
-                            {view === '플래너' && (
-                                <Planner
-                                    todos={todos}
-                                    selectedDate={selectedDate}
-                                    setSelectedDate={setSelectedDate}
-                                    onAdd={handleAddTodo}
-                                    onToggle={handleToggleTodo}
-                                    onDelete={handleDeleteTodo}
-                                />
-                            )}
-                            {view === '공용달력' && (
-                                <CalendarView
-                                    isAdmin={canManageSystem}
-                                    sharedEvents={sharedEvents}
-                                    onAddEvent={handleAddEvent}
-                                    onDeleteEvent={handleDeleteEvent}
-                                />
-                            )}
-                            {view === '자료실' && (
-                                <ResourceView
-                                    resources={resources}
-                                    currentUser={currentUser}
-                                    onAdd={handleAddResource}
-                                />
-                            )}
-                            {view === '메시지' && (
-                                <MessageView
-                                    rooms={rooms}
-                                    currentUser={currentUser}
-                                    localRoomMessages={localRoomMessages}
-                                    onCreateRoom={handleCreateRoom}
-                                    onSendInRoom={handleSendInRoom}
-                                />
-                            )}
-                            {view === '설정' && (
-                                <SettingsView
-                                    currentUser={currentUser}
-                                    userRole={userRole}
-                                    theme={theme}
-                                    suneungDate={suneungDate}
-                                    getDDay={getDDay}
-                                    onThemeChange={async (t) => { setTheme(t); await saveProfile({ theme: t }); }}
-                                    onRoleChange={async (r) => { setUserRole(r); await saveProfile({ role: r }); }}
-                                    onSuneungChange={async (d) => { setSuneungDate(d); await saveProfile({ suneungDate: d }); }}
-                                    onSchoolChange={async (s) => await saveProfile({ school: s })}
-                                    onNameChange={async (n) => { await saveProfile({ name: n }); }}
-                                />
-                            )}
+                            {renderView()}
                         </div>
                     </main>
                 </div>
