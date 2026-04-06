@@ -1343,6 +1343,12 @@
             const [creating,        setCreating]        = useState(false);
             const [joining,         setJoining]         = useState(false);
             const [showGroupSheet,  setShowGroupSheet]  = useState(false);
+            const [customSubjects,  setCustomSubjects]  = useState([]);
+            const [showAddSubject,  setShowAddSubject]  = useState(false);
+            const [newSubjectName,  setNewSubjectName]  = useState('');
+            const [newSubjectIcon,  setNewSubjectIcon]  = useState('📌');
+            const [newSubjectColor, setNewSubjectColor] = useState('#6366f1');
+            const [addingSubject,   setAddingSubject]   = useState(false);
             const sessionStartRef = useRef(null);
             const isLocalAdmin = currentUser?.uid === 'local-admin';
             const today = new Date().toISOString().split('T')[0];
@@ -1377,6 +1383,14 @@
                     }).catch(() => {});
             }, [currentUser?.uid]);
 
+            // 커스텀 과목 로드
+            useEffect(() => {
+                if (isLocalAdmin || !currentUser) return;
+                db.collection('users').doc(currentUser.uid).get()
+                    .then(snap => { if (snap.exists) setCustomSubjects(snap.data().customSubjects || []); })
+                    .catch(() => {});
+            }, [currentUser?.uid]);
+
             // 그룹 presence 구독
             useEffect(() => {
                 if (!studyGroups.length || isLocalAdmin) return;
@@ -1393,7 +1407,62 @@
 
             const fmt = (s) => `${Math.floor(s/3600).toString().padStart(2,'0')}:${Math.floor((s%3600)/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`;
             const fmtMin = (s) => { const m = Math.floor(s/60); const h = Math.floor(m/60); return h > 0 ? `${h}시간 ${m%60}분` : `${m}분`; };
-            const subjectColor = SUBJECTS.find(s => s.id === currentSubject)?.color || '#4f6ef7';
+            const allSubjects = [...SUBJECTS, ...customSubjects];
+            const subjectColor = allSubjects.find(s => s.id === currentSubject)?.color || '#4f6ef7';
+
+            const SUBJECT_COLOR_PRESETS = ['#3b82f6','#ef4444','#10b981','#f59e0b','#8b5cf6','#ec4899','#06b6d4','#84cc16','#f97316','#6366f1'];
+
+            const saveCustomSubject = async () => {
+                const name = newSubjectName.trim();
+                if (!name || addingSubject) return;
+                if (allSubjects.find(s => s.id === name)) { alert('이미 있는 과목 이름입니다.'); return; }
+                setAddingSubject(true);
+                const newSubj = { id: name, icon: newSubjectIcon || '📌', color: newSubjectColor };
+                const updated = [...customSubjects, newSubj];
+                setCustomSubjects(updated);
+                setCurrentSubject(name);
+                setShowAddSubject(false);
+                setNewSubjectName(''); setNewSubjectIcon('📌'); setNewSubjectColor('#6366f1');
+                if (!isLocalAdmin && currentUser) {
+                    await db.collection('users').doc(currentUser.uid).update({ customSubjects: updated }).catch(() => {});
+                }
+                setAddingSubject(false);
+            };
+
+            const deleteCustomSubject = async (id) => {
+                const updated = customSubjects.filter(s => s.id !== id);
+                setCustomSubjects(updated);
+                if (currentSubject === id) setCurrentSubject(SUBJECTS[0].id);
+                if (!isLocalAdmin && currentUser) {
+                    await db.collection('users').doc(currentUser.uid).update({ customSubjects: updated }).catch(() => {});
+                }
+            };
+
+            const AddSubjectForm = () => (
+                <div style={{padding:'16px', borderRadius:'16px', border:'1.5px solid var(--glass-border)', background:'var(--glass-bg2)', marginTop:'10px'}}>
+                    <p style={{fontSize:'9px', fontWeight:900, opacity:0.4, textTransform:'uppercase', letterSpacing:'0.2em', marginBottom:'12px', color:'var(--text)'}}>새 과목 추가</p>
+                    <div style={{display:'flex', gap:'8px', marginBottom:'10px'}}>
+                        <input value={newSubjectIcon} onChange={e=>setNewSubjectIcon(e.target.value)} placeholder="😀" maxLength={2}
+                            style={{width:'52px', textAlign:'center', fontSize:'20px', padding:'6px', borderRadius:'10px', flexShrink:0}} />
+                        <input autoFocus value={newSubjectName} onChange={e=>setNewSubjectName(e.target.value)}
+                            onKeyDown={e=>e.key==='Enter'&&saveCustomSubject()} placeholder="과목 이름" style={{flex:1}} />
+                    </div>
+                    <div style={{display:'flex', gap:'6px', flexWrap:'wrap', marginBottom:'12px'}}>
+                        {SUBJECT_COLOR_PRESETS.map(c => (
+                            <button key={c} onClick={()=>setNewSubjectColor(c)}
+                                style={{width:'24px', height:'24px', borderRadius:'50%', background:c, border:newSubjectColor===c?`3px solid var(--text)`:'2px solid transparent', cursor:'pointer', transition:'transform 0.1s', transform:newSubjectColor===c?'scale(1.2)':'scale(1)'}} />
+                        ))}
+                    </div>
+                    <div style={{display:'flex', gap:'8px'}}>
+                        <button onClick={()=>{setShowAddSubject(false);setNewSubjectName('');}}
+                            style={{flex:1,padding:'8px',borderRadius:'12px',border:'1.5px solid var(--glass-border)',background:'var(--glass-bg2)',cursor:'pointer',fontSize:'11px',fontWeight:800,color:'var(--text-sub)',fontFamily:'Pretendard,sans-serif'}}>취소</button>
+                        <button onClick={saveCustomSubject} disabled={!newSubjectName.trim()||addingSubject}
+                            className="btn-primary" style={{flex:1,padding:'8px',fontSize:'11px',opacity:!newSubjectName.trim()?0.4:1}}>
+                            {addingSubject?'저장 중..':'추가'}
+                        </button>
+                    </div>
+                </div>
+            );
 
             const startTimer = async () => {
                 sessionStartRef.current = new Date();
@@ -1500,7 +1569,7 @@
                                 {memberList.map(([uid, member]) => {
                                     const p = presence[uid];
                                     const studying = p?.isStudying;
-                                    const sc = SUBJECTS.find(s => s.id === p?.subject);
+                                    const sc = allSubjects.find(s => s.id === p?.subject);
                                     const isMe = uid === currentUser?.uid;
                                     return (
                                         <div key={uid} style={{display:'flex', alignItems:'center', gap:'10px', padding:'8px 10px', borderRadius:'12px', background:'var(--glass-bg2)', border: isMe ? '1px solid rgba(79,110,247,0.2)' : 'none'}}>
@@ -1551,7 +1620,7 @@
                         {todaySessions.length > 0 && (
                             <div style={{display:'flex', gap:'6px', flexWrap:'wrap', justifyContent:'center', marginTop:'8px', maxWidth:'320px'}}>
                                 {todaySessions.slice(0,3).map((s,i) => {
-                                    const sc = SUBJECTS.find(x=>x.id===s.subject);
+                                    const sc = allSubjects.find(x=>x.id===s.subject);
                                     return (
                                         <div key={s.id||i} style={{display:'flex', alignItems:'center', gap:'6px', padding:'5px 12px', borderRadius:'99px', background:'var(--glass-bg2)', border:'1px solid var(--glass-border)'}}>
                                             <div style={{width:'6px',height:'6px',borderRadius:'50%',background:sc?.color||'var(--accent)',flexShrink:0}}></div>
@@ -1570,7 +1639,7 @@
                                 <p style={{fontSize:'9px', fontWeight:900, color:'#f59e0b', textTransform:'uppercase', letterSpacing:'0.2em', marginBottom:'10px'}}>👑 관리자 — 공부 시간 추가</p>
                                 <div style={{display:'flex', gap:'8px', alignItems:'center'}}>
                                     <select value={forceSubject} onChange={e=>setForceSubject(e.target.value)} style={{flex:'0 0 auto', padding:'8px 10px', borderRadius:'10px', background:'var(--glass-bg2)', border:'1.5px solid var(--glass-border)', color:'var(--text)', fontFamily:'Pretendard,sans-serif', fontWeight:800, fontSize:'11px', cursor:'pointer'}}>
-                                        {SUBJECTS.map(s => <option key={s.id} value={s.id}>{s.icon} {s.id}</option>)}
+                                        {allSubjects.map(s => <option key={s.id} value={s.id}>{s.icon} {s.id}</option>)}
                                     </select>
                                     <input type="number" min="1" max="600" value={forceMinutes} onChange={e=>setForceMinutes(e.target.value)} onKeyDown={e=>e.key==='Enter'&&forceAddTime()} placeholder="분" style={{flex:1, fontSize:'13px', fontWeight:800, textAlign:'center'}} />
                                     <button onClick={forceAddTime} disabled={!forceMinutes||parseInt(forceMinutes)<=0} style={{flexShrink:0, padding:'8px 14px', borderRadius:'10px', border:'none', cursor:'pointer', fontWeight:900, fontSize:'12px', fontFamily:'Pretendard,sans-serif', color:'#000', background:'#f59e0b', opacity:!forceMinutes?0.4:1}}>추가</button>
@@ -1583,16 +1652,35 @@
                     <div style={{paddingBottom:'16px'}}>
                         {/* 과목 선택 (가로 스크롤) */}
                         <div style={{overflowX:'auto', display:'flex', gap:'8px', padding:'0 16px 14px', scrollbarWidth:'none', WebkitOverflowScrolling:'touch'}}>
-                            {SUBJECTS.map(s => (
-                                <button key={s.id} onClick={()=>{ if(!isTimerOn) setCurrentSubject(s.id); }}
-                                    style={{flexShrink:0, padding:'8px 16px', borderRadius:'99px', border:currentSubject===s.id?`2px solid ${s.color}`:'1.5px solid var(--glass-border)', background:currentSubject===s.id?`${s.color}22`:'var(--glass-bg2)', cursor:isTimerOn&&currentSubject!==s.id?'not-allowed':'pointer', fontSize:'12px', fontWeight:800, color:currentSubject===s.id?s.color:'var(--text-sub)', fontFamily:'Pretendard,sans-serif', transition:'all 0.15s', opacity:isTimerOn&&currentSubject!==s.id?0.25:1, whiteSpace:'nowrap'}}>
-                                    {s.icon} {s.id}
-                                </button>
+                            {allSubjects.map(s => (
+                                <div key={s.id} style={{position:'relative', display:'inline-flex', alignItems:'center', flexShrink:0}}>
+                                    <button onClick={()=>{ if(!isTimerOn) setCurrentSubject(s.id); }}
+                                        style={{flexShrink:0, padding:'8px 16px', borderRadius:'99px', border:currentSubject===s.id?`2px solid ${s.color}`:'1.5px solid var(--glass-border)', background:currentSubject===s.id?`${s.color}22`:'var(--glass-bg2)', cursor:isTimerOn&&currentSubject!==s.id?'not-allowed':'pointer', fontSize:'12px', fontWeight:800, color:currentSubject===s.id?s.color:'var(--text-sub)', fontFamily:'Pretendard,sans-serif', transition:'all 0.15s', opacity:isTimerOn&&currentSubject!==s.id?0.25:1, whiteSpace:'nowrap', paddingRight: customSubjects.find(cs=>cs.id===s.id) ? '26px' : '16px'}}>
+                                        {s.icon} {s.id}
+                                    </button>
+                                    {customSubjects.find(cs=>cs.id===s.id) && !isTimerOn && (
+                                        <button onClick={()=>deleteCustomSubject(s.id)}
+                                            style={{position:'absolute', right:'7px', top:'50%', transform:'translateY(-50%)', background:'none', border:'none', cursor:'pointer', fontSize:'12px', color:'var(--text-sub)', opacity:0.5, padding:'0', lineHeight:1}}>×</button>
+                                    )}
+                                </div>
                             ))}
+                            {!isTimerOn && (
+                                <button onClick={()=>setShowAddSubject(v=>!v)}
+                                    style={{flexShrink:0, padding:'8px 14px', borderRadius:'99px', border:`1.5px dashed ${showAddSubject?'var(--accent)':'var(--glass-border)'}`, background:showAddSubject?'rgba(79,110,247,0.08)':'transparent', cursor:'pointer', fontSize:'12px', fontWeight:800, color:showAddSubject?'var(--accent)':'var(--text-sub)', fontFamily:'Pretendard,sans-serif', whiteSpace:'nowrap'}}>
+                                    + 과목
+                                </button>
+                            )}
                         </div>
 
+                        {/* 과목 추가 폼 (모바일) */}
+                        {showAddSubject && !isTimerOn && (
+                            <div style={{padding:'0 16px 12px'}}>
+                                <AddSubjectForm />
+                            </div>
+                        )}
+
                         {/* 버튼 영역 */}
-                        <div style={{padding:'0 16px'}}>
+                        <div style={{padding:'0 16px', display:'flex', flexDirection:'column', gap:'8px'}}>
                             {!isTimerOn ? (
                                 <button onClick={startTimer}
                                     style={{width:'100%', padding:'18px', borderRadius:'20px', border:'none', cursor:'pointer', fontWeight:900, fontSize:'16px', letterSpacing:'0.06em', fontFamily:'Pretendard,sans-serif', color:'#fff',
@@ -1621,16 +1709,13 @@
                                     </button>
                                 </div>
                             )}
+                            {/* 공부 그룹 버튼 — 시작 버튼 바로 아래 */}
+                            <button onClick={()=>setShowGroupSheet(true)}
+                                style={{width:'100%', padding:'13px', borderRadius:'16px', border:'1.5px solid var(--glass-border)', background:'var(--glass-bg2)', cursor:'pointer', fontWeight:800, fontSize:'13px', color:'var(--text-sub)', fontFamily:'Pretendard,sans-serif', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px'}}>
+                                👥 공부 그룹{studyGroups.length > 0 ? ` (${studyGroups.length})` : ''}
+                            </button>
                         </div>
                     </div>
-
-                    {/* FAB — 공부 그룹 */}
-                    <button onClick={()=>setShowGroupSheet(true)}
-                        style={{position:'absolute', right:'16px', bottom:'80px', width:'54px', height:'54px', borderRadius:'50%', border:'none', cursor:'pointer', fontSize:'22px', display:'flex', alignItems:'center', justifyContent:'center',
-                            background:`linear-gradient(135deg, var(--accent), var(--accent2))`,
-                            boxShadow:'0 6px 24px rgba(79,110,247,0.45)', zIndex:10}}>
-                        👥
-                    </button>
 
                     {/* 그룹 바텀 시트 */}
                     {showGroupSheet && (
@@ -1666,14 +1751,28 @@
                                 {/* 과목 선택 */}
                                 <div style={{marginBottom:'24px'}}>
                                     <p style={{fontSize:'9px', fontWeight:900, opacity:0.35, textTransform:'uppercase', letterSpacing:'0.2em', marginBottom:'12px', color:'var(--text)'}}>과목 선택</p>
-                                    <div style={{display:'flex', gap:'8px', flexWrap:'wrap'}}>
-                                        {SUBJECTS.map(s => (
-                                            <button key={s.id} onClick={()=>{ if(!isTimerOn) setCurrentSubject(s.id); }}
-                                                style={{padding:'8px 18px', borderRadius:'99px', border:currentSubject===s.id?`2px solid ${s.color}`:'1.5px solid var(--glass-border)', background:currentSubject===s.id?`${s.color}22`:'var(--glass-bg2)', cursor:isTimerOn&&currentSubject!==s.id?'not-allowed':'pointer', fontSize:'12px', fontWeight:800, color:currentSubject===s.id?s.color:'var(--text-sub)', fontFamily:'Pretendard,sans-serif', transition:'all 0.15s', opacity:isTimerOn&&currentSubject!==s.id?0.3:1}}>
-                                                {s.icon} {s.id}
-                                            </button>
+                                    <div style={{display:'flex', gap:'8px', flexWrap:'wrap', alignItems:'center'}}>
+                                        {allSubjects.map(s => (
+                                            <div key={s.id} style={{position:'relative', display:'inline-flex', alignItems:'center'}}>
+                                                <button onClick={()=>{ if(!isTimerOn) setCurrentSubject(s.id); }}
+                                                    style={{padding:'8px 18px', borderRadius:'99px', border:currentSubject===s.id?`2px solid ${s.color}`:'1.5px solid var(--glass-border)', background:currentSubject===s.id?`${s.color}22`:'var(--glass-bg2)', cursor:isTimerOn&&currentSubject!==s.id?'not-allowed':'pointer', fontSize:'12px', fontWeight:800, color:currentSubject===s.id?s.color:'var(--text-sub)', fontFamily:'Pretendard,sans-serif', transition:'all 0.15s', opacity:isTimerOn&&currentSubject!==s.id?0.3:1, paddingRight: customSubjects.find(cs=>cs.id===s.id) ? '28px' : '18px'}}>
+                                                    {s.icon} {s.id}
+                                                </button>
+                                                {customSubjects.find(cs=>cs.id===s.id) && !isTimerOn && (
+                                                    <button onClick={()=>deleteCustomSubject(s.id)}
+                                                        style={{position:'absolute', right:'6px', top:'50%', transform:'translateY(-50%)', background:'none', border:'none', cursor:'pointer', fontSize:'12px', color:'var(--text-sub)', opacity:0.4, padding:'0', lineHeight:1, fontFamily:'Pretendard,sans-serif'}}
+                                                        onMouseEnter={e=>e.currentTarget.style.opacity='1'} onMouseLeave={e=>e.currentTarget.style.opacity='0.4'}>×</button>
+                                                )}
+                                            </div>
                                         ))}
+                                        {!isTimerOn && (
+                                            <button onClick={()=>setShowAddSubject(v=>!v)}
+                                                style={{padding:'8px 14px', borderRadius:'99px', border:`1.5px dashed ${showAddSubject ? 'var(--accent)' : 'var(--glass-border)'}`, background:showAddSubject?'rgba(79,110,247,0.08)':'transparent', cursor:'pointer', fontSize:'12px', fontWeight:800, color:showAddSubject?'var(--accent)':'var(--text-sub)', fontFamily:'Pretendard,sans-serif', transition:'all 0.15s'}}>
+                                                + 과목
+                                            </button>
+                                        )}
                                     </div>
+                                    {showAddSubject && !isTimerOn && <AddSubjectForm />}
                                 </div>
 
                                 {/* 타이머 디스플레이 */}
@@ -1735,7 +1834,7 @@
                                         <div style={{display:'flex', gap:'8px', alignItems:'center'}}>
                                             <select value={forceSubject} onChange={e=>setForceSubject(e.target.value)}
                                                 style={{flex:'0 0 auto', padding:'9px 12px', borderRadius:'12px', background:'var(--glass-bg2)', border:'1.5px solid var(--glass-border)', color:'var(--text)', fontFamily:'Pretendard,sans-serif', fontWeight:800, fontSize:'12px', cursor:'pointer'}}>
-                                                {SUBJECTS.map(s => <option key={s.id} value={s.id}>{s.icon} {s.id}</option>)}
+                                                {allSubjects.map(s => <option key={s.id} value={s.id}>{s.icon} {s.id}</option>)}
                                             </select>
                                             <input type="number" min="1" max="600" value={forceMinutes} onChange={e=>setForceMinutes(e.target.value)}
                                                 onKeyDown={e=>e.key==='Enter'&&forceAddTime()}
@@ -1755,7 +1854,7 @@
                                         <p style={{fontSize:'9px', fontWeight:900, opacity:0.35, textTransform:'uppercase', letterSpacing:'0.2em', marginBottom:'10px', color:'var(--text)'}}>오늘의 세션</p>
                                         <div style={{display:'flex', flexDirection:'column', gap:'6px'}}>
                                             {todaySessions.map((s,i) => {
-                                                const sc = SUBJECTS.find(x=>x.id===s.subject);
+                                                const sc = allSubjects.find(x=>x.id===s.subject);
                                                 return (
                                                     <div key={s.id||i} className="glass-inset" style={{padding:'9px 14px', display:'flex', alignItems:'center', justifyContent:'space-between'}}>
                                                         <div style={{display:'flex', alignItems:'center', gap:'10px'}}>
