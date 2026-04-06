@@ -614,13 +614,16 @@
             const [localRoomMessages, setLocalRoomMessages] = useState({});
             const [sharedEvents, setSharedEvents] = useState([]);
             const [posts, setPosts]               = useState([]);
+            const [calendarGroup,  setCalendarGroup]  = useState(null);
+            const [calendarEvents, setCalendarEvents] = useState([]);
 
             const [studyTime, setStudyTime]       = useState(0);
             const [suneungDate, setSuneungDate]   = useState('2025-11-13');
             const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
             const [studyGroups, setStudyGroups]   = useState([]);
 
-            const unsubRefs = useRef([]);
+            const unsubRefs      = useRef([]);
+            const calEventsUnsub = useRef(null);
 
             // 테마 적용 (로컬)
             useEffect(() => {
@@ -659,11 +662,13 @@
                         // 로그아웃: 리스너 해제 및 상태 초기화
                         unsubRefs.current.forEach(u => u());
                         unsubRefs.current = [];
+                        calEventsUnsub.current?.(); calEventsUnsub.current = null;
                         setCurrentUser(null);
                         setNeedsSetup(null);
                         setTodos([]); setResources([]); setAnnouncements([]);
                         setRooms([]); setLocalRoomMessages({}); setSharedEvents([]); setPosts([]);
                         setStudyGroups([]); setStudyTime(0);
+                        setCalendarGroup(null); setCalendarEvents([]);
                     }
                     setLoading(false);
                 });
@@ -712,6 +717,17 @@
                 const unsubGroups = db.collection('studyGroups')
                     .where('members', 'array-contains', uid)
                     .onSnapshot(snap => setStudyGroups(snap.docs.map(d => ({ id: d.id, ...d.data() }))), () => {});
+
+                // 달력 그룹 로드
+                const calGroupSnap = await db.collection('calendarGroups')
+                    .where('members', 'array-contains', uid).limit(1).get().catch(() => null);
+                if (calGroupSnap && !calGroupSnap.empty) {
+                    const gDoc = calGroupSnap.docs[0];
+                    setCalendarGroup({ id: gDoc.id, ...gDoc.data() });
+                    calEventsUnsub.current = db.collection('calendarGroups').doc(gDoc.id)
+                        .collection('events')
+                        .onSnapshot(snap => setCalendarEvents(snap.docs.map(d => ({ id: d.id, ...d.data() }))), () => {});
+                }
 
                 unsubRefs.current = [unsubAnn, unsubEvents, unsubRes, unsubPosts, unsubRooms, unsubGroups];
             };
@@ -816,12 +832,74 @@
                 await db.collection('announcements').add({ title, content, date: newAnn.date, authorUid: currentUser.uid });
             };
 
-            // ── 공용 달력 핸들러 ─────────────────────────────────────────────
+            // ── 달력 그룹 핸들러 ─────────────────────────────────────────────
+            const subscribeCalEvents = (groupId) => {
+                calEventsUnsub.current?.();
+                calEventsUnsub.current = db.collection('calendarGroups').doc(groupId)
+                    .collection('events')
+                    .onSnapshot(snap => setCalendarEvents(snap.docs.map(d => ({ id: d.id, ...d.data() }))), () => {});
+            };
+
+            const handleCreateCalendarGroup = async (name) => {
+                if (!currentUser) return;
+                const code = Math.random().toString(36).substr(2, 6).toUpperCase();
+                if (isLocalAdmin()) {
+                    const g = { id: 'local-cal', name, code, ownerUid: 'local-admin', members: ['local-admin'] };
+                    setCalendarGroup(g); return;
+                }
+                const ref = await db.collection('calendarGroups').add({
+                    name, code, ownerUid: currentUser.uid,
+                    members: [currentUser.uid],
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                setCalendarGroup({ id: ref.id, name, code, ownerUid: currentUser.uid, members: [currentUser.uid] });
+                subscribeCalEvents(ref.id);
+            };
+
+            const handleJoinCalendarGroup = async (code) => {
+                if (!currentUser) return;
+                if (isLocalAdmin()) { alert('로컬 어드민은 그룹 참여 불가'); return; }
+                const snap = await db.collection('calendarGroups').where('code', '==', code.toUpperCase()).limit(1).get();
+                if (snap.empty) { alert('그룹을 찾을 수 없습니다.'); return; }
+                const gDoc = snap.docs[0];
+                await db.collection('calendarGroups').doc(gDoc.id).update({
+                    members: firebase.firestore.FieldValue.arrayUnion(currentUser.uid)
+                });
+                setCalendarGroup({ id: gDoc.id, ...gDoc.data(), members: [...(gDoc.data().members || []), currentUser.uid] });
+                subscribeCalEvents(gDoc.id);
+            };
+
+            const handleLeaveCalendarGroup = async () => {
+                if (!calendarGroup || !currentUser) return;
+                if (!isLocalAdmin()) {
+                    await db.collection('calendarGroups').doc(calendarGroup.id).update({
+                        members: firebase.firestore.FieldValue.arrayRemove(currentUser.uid)
+                    }).catch(() => {});
+                }
+                calEventsUnsub.current?.(); calEventsUnsub.current = null;
+                setCalendarGroup(null); setCalendarEvents([]);
+            };
+
+            const handleAddCalendarEvent = async (day, month, year, text) => {
+                if (!calendarGroup) return;
+                const newEvent = { id: String(Date.now()), day, month, year, text };
+                if (isLocalAdmin()) { setCalendarEvents(prev => [...prev, newEvent]); return; }
+                await db.collection('calendarGroups').doc(calendarGroup.id).collection('events').add({
+                    day, month, year, text, authorUid: currentUser.uid,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+            };
+
+            const handleDeleteCalendarEvent = async (id) => {
+                if (!calendarGroup) return;
+                if (isLocalAdmin()) { setCalendarEvents(prev => prev.filter(e => e.id !== id)); return; }
+                await db.collection('calendarGroups').doc(calendarGroup.id).collection('events').doc(id).delete().catch(() => {});
+            };
+
+            // ── (레거시) 공용 달력 핸들러 — 하위 호환 ───────────────────────
             const handleAddEvent = async (day, text) => {
                 const now = new Date();
-                const newEvent = { id: String(Date.now()), day, text, color: 'bg-indigo-600', month: now.getMonth(), year: now.getFullYear() };
-                if (isLocalAdmin()) { setSharedEvents(prev => [...prev, newEvent]); return; }
-                await db.collection('events').add({ day, text, color: 'bg-indigo-600', month: now.getMonth(), year: now.getFullYear() });
+                await handleAddCalendarEvent(day, now.getMonth(), now.getFullYear(), text);
             };
 
             // ── 자료실 핸들러 ────────────────────────────────────────────────
@@ -858,11 +936,8 @@
                 });
             };
 
-            // ── 공용 달력 일정 삭제 ──────────────────────────────────────────
-            const handleDeleteEvent = async (id) => {
-                if (isLocalAdmin()) { setSharedEvents(prev => prev.filter(e => e.id !== id)); return; }
-                await db.collection('events').doc(id).delete().catch(() => {});
-            };
+            // ── (레거시) 공용 달력 삭제
+            const handleDeleteEvent = async (id) => handleDeleteCalendarEvent(id);
 
             // ── 공부 핸들러 ──────────────────────────────────────────────────
             const handleStudyStart = async (subject) => {
@@ -1047,7 +1122,7 @@
                 {view === '플래너'   && <Planner todos={todos} selectedDate={selectedDate} setSelectedDate={setSelectedDate} onAdd={handleAddTodo} onToggle={handleToggleTodo} onDelete={handleDeleteTodo} />}
                 {view === '공지사항' && <NoticeView isAdmin={canManageSystem} announcements={announcements} onAdd={handleAddAnnouncement} />}
                 {view === '커뮤니티' && <CommunityView posts={posts} currentUser={currentUser} onAddPost={handleAddPost} />}
-                {view === '공용달력' && <CalendarView isAdmin={canManageSystem} sharedEvents={sharedEvents} onAddEvent={handleAddEvent} onDeleteEvent={handleDeleteEvent} isMobileUI={isMobileUI} />}
+                {view === '공용달력' && <CalendarView calendarGroup={calendarGroup} calendarEvents={calendarEvents} onCreateGroup={handleCreateCalendarGroup} onJoinGroup={handleJoinCalendarGroup} onLeaveGroup={handleLeaveCalendarGroup} onAddEvent={handleAddCalendarEvent} onDeleteEvent={handleDeleteCalendarEvent} isMobileUI={isMobileUI} currentUser={currentUser} />}
                 {view === '자료실'   && <ResourceView resources={resources} currentUser={currentUser} onAdd={handleAddResource} />}
                 {view === '메시지'   && <MessageView rooms={rooms} currentUser={currentUser} localRoomMessages={localRoomMessages} onCreateRoom={handleCreateRoom} onSendInRoom={handleSendInRoom} isMobileUI={isMobileUI} />}
                 {view === '설정'     && <SettingsView currentUser={currentUser} userRole={userRole} theme={theme} suneungDate={suneungDate} getDDay={getDDay} onThemeChange={async (t) => { setTheme(t); await saveProfile({ theme: t }); }} onRoleChange={async (r) => { setUserRole(r); await saveProfile({ role: r }); }} onSuneungChange={async (d) => { setSuneungDate(d); await saveProfile({ suneungDate: d }); }} onSchoolChange={async (s) => await saveProfile({ school: s })} onNameChange={async (n) => { await saveProfile({ name: n }); }} />}
@@ -2442,7 +2517,7 @@
 
         // ─── CalendarView ────────────────────────────────────────────────────
 
-        function CalendarView({ isAdmin, sharedEvents, onAddEvent, onDeleteEvent, isMobileUI }) {
+        function CalendarView({ calendarGroup, calendarEvents, onCreateGroup, onJoinGroup, onLeaveGroup, onAddEvent, onDeleteEvent, isMobileUI, currentUser }) {
             const now = new Date();
             const year = now.getFullYear(); const month = now.getMonth();
             const days = useMemo(() => {
@@ -2454,144 +2529,272 @@
                 return arr;
             }, [year, month]);
 
-            const [addingDay, setAddingDay] = useState(null);
-            const [eventText, setEventText] = useState('');
-            const [saving, setSaving]       = useState(false);
+            const [addingDay,    setAddingDay]    = useState(null);
+            const [eventText,    setEventText]    = useState('');
+            const [saving,       setSaving]       = useState(false);
+            // 그룹 관련 상태
+            const [groupView,    setGroupView]    = useState('none'); // 'none'|'create'|'join'
+            const [groupName,    setGroupName]    = useState('');
+            const [joinCode,     setJoinCode]     = useState('');
+            const [groupLoading, setGroupLoading] = useState(false);
+            const [showGroupInfo, setShowGroupInfo] = useState(false); // 모바일: 그룹 정보 시트
 
             const clickDay = (day) => {
-                if (!isAdmin || !day) return;
-                setAddingDay(day); setEventText('');
+                if (!calendarGroup || !day) return;
+                setAddingDay(d => d === day ? null : day); setEventText('');
             };
             const confirmEvent = async () => {
                 if (!eventText.trim()) return;
                 setSaving(true);
-                await onAddEvent(addingDay, eventText.trim());
+                await onAddEvent(addingDay, month, year, eventText.trim());
                 setSaving(false); setAddingDay(null); setEventText('');
+            };
+
+            const createGroup = async () => {
+                if (!groupName.trim() || groupLoading) return;
+                setGroupLoading(true);
+                await onCreateGroup(groupName.trim());
+                setGroupLoading(false); setGroupName(''); setGroupView('none');
+            };
+            const joinGroup = async () => {
+                if (!joinCode.trim() || groupLoading) return;
+                setGroupLoading(true);
+                await onJoinGroup(joinCode.trim());
+                setGroupLoading(false); setJoinCode(''); setGroupView('none');
             };
 
             const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
             const gap = isMobileUI ? 3 : 6;
 
-            return (
-                <div className="anim-fade-up">
-                    <div className="glass-card-lg" style={{padding: isMobileUI ? '16px' : '28px 32px'}}>
-                        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: isMobileUI ? '12px' : '20px'}}>
-                            <div>
-                                <h3 style={{fontSize: isMobileUI ? '15px' : '18px', fontWeight:900, color:'var(--text)'}}>🗓️ 공용 달력</h3>
-                                <p style={{fontSize:'10px', fontWeight:700, opacity:0.35, textTransform:'uppercase', letterSpacing:'0.15em', marginTop:'2px'}}>{MONTHS[month]} {year}</p>
-                            </div>
-                            {isAdmin && <span style={{fontSize:'10px', fontWeight:800, opacity:0.4, color:'var(--accent)'}}>날짜 클릭 → 일정 추가</span>}
-                        </div>
-
-                        {/* 요일 헤더 */}
-                        <div style={{display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:`${gap}px`, marginBottom:`${gap}px`}}>
-                            {['일','월','화','수','목','금','토'].map((d,i) => (
-                                <div key={d} style={{textAlign:'center', fontSize: isMobileUI ? '9px' : '10px', fontWeight:800, opacity:0.3, padding:'4px 0', color: i===0?'#ef4444': i===6?'#60a5fa':'var(--text-sub)'}}>{d}</div>
-                            ))}
-                        </div>
-
-                        {/* 날짜 그리드 */}
-                        <div style={{display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:`${gap}px`}}>
-                            {days.map((d, i) => {
-                                const isToday = d === now.getDate();
-                                const events = d ? sharedEvents.filter(e => e.day === d && e.month === month && e.year === year) : [];
-                                return (
-                                    <div
-                                        key={i}
-                                        className={d ? (isMobileUI ? 'cal-cell-mob' : 'cal-cell') : ''}
-                                        style={{
-                                            cursor: d&&isAdmin ? 'pointer' : 'default',
-                                            opacity: d ? 1 : 0,
-                                            border: isToday ? '2px solid var(--accent)' : undefined,
-                                            background: isToday ? 'rgba(79,110,247,0.08)' : undefined,
-                                        }}
-                                        onClick={() => clickDay(d)}>
-                                        {d && <>
-                                            <div style={{fontSize: isMobileUI ? '10px' : '12px', fontWeight: isToday ? 900 : 700, color: isToday ? 'var(--accent)' : 'var(--text)', opacity: isToday ? 1 : 0.6, marginBottom: isMobileUI ? '2px' : '4px', textAlign: isMobileUI ? 'center' : undefined}}>{d}</div>
-                                            {isMobileUI ? (
-                                                /* 모바일: 이벤트 수만큼 점으로 표시 */
-                                                events.length > 0 && (
-                                                    <div style={{display:'flex', justifyContent:'center', gap:'2px', flexWrap:'wrap'}}>
-                                                        {events.slice(0,3).map((e, idx) => (
-                                                            <div key={idx} style={{width:'5px', height:'5px', borderRadius:'50%', background:'var(--accent)', flexShrink:0}} />
-                                                        ))}
-                                                    </div>
-                                                )
-                                            ) : (
-                                                <div style={{display:'flex', flexDirection:'column', gap:'3px'}}>
-                                                    {events.map((e, idx) => (
-                                                        <div key={idx}
-                                                            onClick={ev=>ev.stopPropagation()}
-                                                            style={{display:'flex', alignItems:'center', gap:'3px', padding:'2px 5px 2px 6px', borderRadius:'6px', fontSize:'8px', fontWeight:800, color:'#fff', background:'var(--accent)', overflow:'hidden', minWidth:0}}>
-                                                            <span style={{overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', flex:1}}>{e.text}</span>
-                                                            {isAdmin && (
-                                                                <span onClick={()=>onDeleteEvent(e.id)}
-                                                                    style={{flexShrink:0, cursor:'pointer', opacity:0.6, fontSize:'10px', lineHeight:1, marginLeft:'2px'}}
-                                                                    onMouseEnter={ev=>ev.currentTarget.style.opacity='1'}
-                                                                    onMouseLeave={ev=>ev.currentTarget.style.opacity='0.6'}>×</span>
-                                                            )}
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </>}
-                                    </div>
-                                );
-                            })}
-                        </div>
-
-                        {/* 모바일: 선택한 날 이벤트 목록 */}
-                        {isMobileUI && addingDay && (() => {
-                            const dayEvents = sharedEvents.filter(e => e.day === addingDay && e.month === month && e.year === year);
+            // ── 공통: 달력 그리드 ──────────────────────────────────────────────
+            const CalGrid = () => (
+                <>
+                    <div style={{display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:`${gap}px`, marginBottom:`${gap}px`}}>
+                        {['일','월','화','수','목','금','토'].map((d,i) => (
+                            <div key={d} style={{textAlign:'center', fontSize: isMobileUI ? '9px' : '10px', fontWeight:800, opacity:0.3, padding:'4px 0', color: i===0?'#ef4444':i===6?'#60a5fa':'var(--text-sub)'}}>{d}</div>
+                        ))}
+                    </div>
+                    <div style={{display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:`${gap}px`}}>
+                        {days.map((d, i) => {
+                            const isToday = d === now.getDate();
+                            const events  = d ? calendarEvents.filter(e => e.day === d && e.month === month && e.year === year) : [];
+                            const isSelected = addingDay === d;
                             return (
-                                <div style={{marginTop:'12px', padding:'12px 14px', borderRadius:'16px', background:'var(--glass-bg2)', border:'1px solid var(--glass-border)'}}>
-                                    <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'10px'}}>
-                                        <span style={{fontSize:'13px', fontWeight:900, color:'var(--accent)'}}>{addingDay}일 일정</span>
-                                        <button onClick={()=>setAddingDay(null)} style={{background:'none',border:'none',cursor:'pointer',fontSize:'18px',color:'var(--text-sub)',opacity:0.4,lineHeight:1}}>×</button>
-                                    </div>
-                                    {dayEvents.length > 0 && (
-                                        <div style={{display:'flex', flexDirection:'column', gap:'6px', marginBottom:'10px'}}>
-                                            {dayEvents.map((e, idx) => (
-                                                <div key={idx} style={{display:'flex', alignItems:'center', justifyContent:'space-between', padding:'7px 10px', borderRadius:'10px', background:'rgba(79,110,247,0.1)', border:'1px solid rgba(79,110,247,0.2)'}}>
-                                                    <span style={{fontSize:'13px', fontWeight:700, color:'var(--text)'}}>{e.text}</span>
-                                                    {isAdmin && <button onClick={()=>onDeleteEvent(e.id)} style={{background:'none',border:'none',cursor:'pointer',fontSize:'16px',color:'#ef4444',opacity:0.6,lineHeight:1}}>×</button>}
+                                <div key={i}
+                                    className={d ? (isMobileUI ? 'cal-cell-mob' : 'cal-cell') : ''}
+                                    style={{cursor: d ? 'pointer' : 'default', opacity: d ? 1 : 0,
+                                        border: isSelected ? '2px solid var(--accent)' : isToday ? '2px solid var(--accent)' : undefined,
+                                        background: isSelected ? 'rgba(79,110,247,0.12)' : isToday ? 'rgba(79,110,247,0.06)' : undefined}}
+                                    onClick={() => clickDay(d)}>
+                                    {d && <>
+                                        <div style={{fontSize: isMobileUI ? '10px' : '12px', fontWeight: isToday ? 900 : 700, color: isToday||isSelected ? 'var(--accent)' : 'var(--text)', opacity: isToday||isSelected ? 1 : 0.6, marginBottom: isMobileUI ? '2px' : '4px', textAlign: isMobileUI ? 'center' : undefined}}>{d}</div>
+                                        {isMobileUI ? (
+                                            events.length > 0 && (
+                                                <div style={{display:'flex', justifyContent:'center', gap:'2px', flexWrap:'wrap'}}>
+                                                    {events.slice(0,3).map((_,idx) => <div key={idx} style={{width:'5px', height:'5px', borderRadius:'50%', background:'var(--accent)', flexShrink:0}} />)}
                                                 </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                    {isAdmin && (
-                                        <div style={{display:'flex', gap:'8px'}}>
-                                            <input autoFocus value={eventText} onChange={e=>setEventText(e.target.value)}
-                                                onKeyDown={e=>{ if(e.key==='Enter') confirmEvent(); }}
-                                                placeholder="새 일정 입력 후 추가"
-                                                style={{flex:1, fontSize:'13px', fontWeight:700}} />
-                                            <button className="btn-primary" onClick={confirmEvent} disabled={saving||!eventText.trim()} style={{flexShrink:0, padding:'10px 16px', opacity:!eventText.trim()?0.4:1}}>
-                                                {saving?'...':'추가'}
-                                            </button>
-                                        </div>
-                                    )}
+                                            )
+                                        ) : (
+                                            <div style={{display:'flex', flexDirection:'column', gap:'3px'}}>
+                                                {events.map((e, idx) => (
+                                                    <div key={idx} onClick={ev=>ev.stopPropagation()}
+                                                        style={{display:'flex', alignItems:'center', gap:'3px', padding:'2px 5px 2px 6px', borderRadius:'6px', fontSize:'8px', fontWeight:800, color:'#fff', background:'var(--accent)', overflow:'hidden', minWidth:0}}>
+                                                        <span style={{overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', flex:1}}>{e.text}</span>
+                                                        <span onClick={()=>onDeleteEvent(e.id)} style={{flexShrink:0, cursor:'pointer', opacity:0.6, fontSize:'10px', lineHeight:1, marginLeft:'2px'}}
+                                                            onMouseEnter={ev=>ev.currentTarget.style.opacity='1'} onMouseLeave={ev=>ev.currentTarget.style.opacity='0.6'}>×</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </>}
                                 </div>
                             );
-                        })()}
+                        })}
+                    </div>
 
-                        {/* 데스크톱: 일정 추가 입력 */}
-                        {!isMobileUI && addingDay && (
-                            <div className="glass-inset" style={{marginTop:'20px', padding:'14px 20px', display:'flex', alignItems:'center', gap:'12px', animation:'fadeInUp 0.2s ease both'}}>
-                                <span style={{fontSize:'13px', fontWeight:900, color:'var(--accent)', flexShrink:0, minWidth:'48px'}}>{addingDay}일</span>
-                                <input
-                                    autoFocus
-                                    value={eventText} onChange={e=>setEventText(e.target.value)}
+                    {/* 날짜 클릭 시 일정 패널 */}
+                    {addingDay && (
+                        <div style={{marginTop: isMobileUI ? '12px' : '20px', padding: isMobileUI ? '12px 14px' : '14px 20px', borderRadius:'16px', background:'var(--glass-bg2)', border:'1px solid var(--glass-border)', animation:'slideUp 0.2s ease both'}}>
+                            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'10px'}}>
+                                <span style={{fontSize:'13px', fontWeight:900, color:'var(--accent)'}}>{addingDay}일 일정</span>
+                                <button onClick={()=>setAddingDay(null)} style={{background:'none',border:'none',cursor:'pointer',fontSize:'18px',color:'var(--text-sub)',opacity:0.4,lineHeight:1}}>×</button>
+                            </div>
+                            {(() => {
+                                const dayEvts = calendarEvents.filter(e => e.day === addingDay && e.month === month && e.year === year);
+                                return dayEvts.length > 0 ? (
+                                    <div style={{display:'flex', flexDirection:'column', gap:'6px', marginBottom:'10px'}}>
+                                        {dayEvts.map((e, idx) => (
+                                            <div key={idx} style={{display:'flex', alignItems:'center', justifyContent:'space-between', padding:'8px 12px', borderRadius:'10px', background:'rgba(79,110,247,0.08)', border:'1px solid rgba(79,110,247,0.18)'}}>
+                                                <span style={{fontSize:'13px', fontWeight:700, color:'var(--text)'}}>{e.text}</span>
+                                                <button onClick={()=>onDeleteEvent(e.id)} style={{background:'none',border:'none',cursor:'pointer',fontSize:'16px',color:'#ef4444',opacity:0.5,lineHeight:1}}
+                                                    onMouseEnter={ev=>ev.currentTarget.style.opacity='1'} onMouseLeave={ev=>ev.currentTarget.style.opacity='0.5'}>×</button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : <div style={{fontSize:'11px', opacity:0.3, marginBottom:'10px', fontWeight:700}}>등록된 일정이 없습니다</div>;
+                            })()}
+                            <div style={{display:'flex', gap:'8px'}}>
+                                <input autoFocus value={eventText} onChange={e=>setEventText(e.target.value)}
                                     onKeyDown={e=>{ if(e.key==='Enter') confirmEvent(); if(e.key==='Escape') setAddingDay(null); }}
-                                    placeholder="일정을 입력하세요 (Enter로 추가)"
-                                    style={{flex:1, fontSize:'13px', fontWeight:700}}
-                                />
-                                <button className="btn-primary" onClick={confirmEvent} disabled={saving || !eventText.trim()} style={{flexShrink:0, padding:'10px 18px', opacity:!eventText.trim()?0.4:1}}>
-                                    {saving ? '...' : '추가'}
+                                    placeholder="새 일정 입력 후 추가"
+                                    style={{flex:1, fontSize:'13px', fontWeight:700}} />
+                                <button className="btn-primary" onClick={confirmEvent} disabled={saving||!eventText.trim()} style={{flexShrink:0, padding:'10px 16px', opacity:!eventText.trim()?0.4:1}}>
+                                    {saving?'...':'추가'}
                                 </button>
-                                <button onClick={()=>setAddingDay(null)} style={{background:'none', border:'none', cursor:'pointer', fontSize:'18px', color:'var(--text-sub)', opacity:0.4, lineHeight:1}}>×</button>
+                            </div>
+                        </div>
+                    )}
+                </>
+            );
+
+            // ── 그룹 없음: 모바일 ─────────────────────────────────────────────
+            if (!calendarGroup && isMobileUI) return (
+                <div className="anim-fade-up" style={{display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', minHeight:'60vh', padding:'32px 24px', gap:'0'}}>
+                    <div style={{fontSize:'52px', marginBottom:'16px'}}>🗓️</div>
+                    <h3 style={{fontSize:'20px', fontWeight:900, color:'var(--text)', marginBottom:'8px', textAlign:'center'}}>달력 그룹</h3>
+                    <p style={{fontSize:'13px', fontWeight:700, opacity:0.4, textAlign:'center', marginBottom:'32px', lineHeight:1.6}}>그룹을 만들거나 참여하면<br/>멤버들과 일정을 공유할 수 있어요</p>
+
+                    {groupView === 'none' && (
+                        <div style={{display:'flex', flexDirection:'column', gap:'12px', width:'100%', maxWidth:'320px'}}>
+                            <button onClick={()=>setGroupView('create')} className="btn-primary" style={{padding:'16px', fontSize:'15px', fontWeight:900, borderRadius:'18px'}}>
+                                + 그룹 만들기
+                            </button>
+                            <button onClick={()=>setGroupView('join')}
+                                style={{padding:'16px', fontSize:'15px', fontWeight:900, borderRadius:'18px', border:'1.5px solid var(--glass-border)', background:'var(--glass-bg2)', cursor:'pointer', color:'var(--text)', fontFamily:'Pretendard,sans-serif'}}>
+                                코드로 참여하기
+                            </button>
+                        </div>
+                    )}
+
+                    {groupView === 'create' && (
+                        <div style={{width:'100%', maxWidth:'320px', display:'flex', flexDirection:'column', gap:'12px'}}>
+                            <p style={{fontSize:'11px', fontWeight:900, opacity:0.4, textTransform:'uppercase', letterSpacing:'0.15em', color:'var(--text)'}}>그룹 이름</p>
+                            <input autoFocus value={groupName} onChange={e=>setGroupName(e.target.value)}
+                                onKeyDown={e=>e.key==='Enter'&&createGroup()}
+                                placeholder="예: 3학년 5반" style={{width:'100%', fontSize:'14px', fontWeight:700}} />
+                            <div style={{display:'flex', gap:'8px'}}>
+                                <button onClick={()=>{setGroupView('none');setGroupName('');}} style={{flex:1,padding:'13px',borderRadius:'14px',border:'1.5px solid var(--glass-border)',background:'var(--glass-bg2)',cursor:'pointer',fontSize:'13px',fontWeight:800,color:'var(--text-sub)',fontFamily:'Pretendard,sans-serif'}}>취소</button>
+                                <button onClick={createGroup} disabled={!groupName.trim()||groupLoading} className="btn-primary" style={{flex:1,padding:'13px',opacity:!groupName.trim()?0.4:1}}>{groupLoading?'생성 중..':'만들기'}</button>
+                            </div>
+                        </div>
+                    )}
+
+                    {groupView === 'join' && (
+                        <div style={{width:'100%', maxWidth:'320px', display:'flex', flexDirection:'column', gap:'12px'}}>
+                            <p style={{fontSize:'11px', fontWeight:900, opacity:0.4, textTransform:'uppercase', letterSpacing:'0.15em', color:'var(--text)'}}>참여 코드</p>
+                            <input autoFocus value={joinCode} onChange={e=>setJoinCode(e.target.value.toUpperCase())}
+                                onKeyDown={e=>e.key==='Enter'&&joinGroup()}
+                                placeholder="6자리 코드" style={{width:'100%', fontSize:'18px', fontWeight:900, textAlign:'center', letterSpacing:'0.3em', fontFamily:'monospace'}} />
+                            <div style={{display:'flex', gap:'8px'}}>
+                                <button onClick={()=>{setGroupView('none');setJoinCode('');}} style={{flex:1,padding:'13px',borderRadius:'14px',border:'1.5px solid var(--glass-border)',background:'var(--glass-bg2)',cursor:'pointer',fontSize:'13px',fontWeight:800,color:'var(--text-sub)',fontFamily:'Pretendard,sans-serif'}}>취소</button>
+                                <button onClick={joinGroup} disabled={!joinCode.trim()||groupLoading} className="btn-primary" style={{flex:1,padding:'13px',opacity:!joinCode.trim()?0.4:1}}>{groupLoading?'참여 중..':'참여'}</button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+
+            // ── 그룹 없음: PC ─────────────────────────────────────────────────
+            if (!calendarGroup) return (
+                <div className="anim-fade-up" style={{display:'grid', gridTemplateColumns:'1fr 300px', gap:'20px', alignItems:'start'}}>
+                    {/* 왼쪽: 빈 달력 안내 */}
+                    <div className="glass-card-lg" style={{padding:'40px', textAlign:'center', display:'flex', flexDirection:'column', alignItems:'center', gap:'12px'}}>
+                        <div style={{fontSize:'48px'}}>🗓️</div>
+                        <h3 style={{fontSize:'20px', fontWeight:900, color:'var(--text)'}}>달력 그룹이 없습니다</h3>
+                        <p style={{fontSize:'13px', fontWeight:700, opacity:0.4, lineHeight:1.7}}>그룹을 만들거나 참여하면 멤버들과<br/>일정을 공유할 수 있습니다.</p>
+                    </div>
+                    {/* 오른쪽: 그룹 만들기/참여 */}
+                    <div style={{display:'flex', flexDirection:'column', gap:'12px'}}>
+                        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'8px'}}>
+                            <button onClick={()=>setGroupView(v=>v==='create'?'none':'create')} className="btn-primary" style={{padding:'10px', fontSize:'11px', fontWeight:900}}>+ 만들기</button>
+                            <button onClick={()=>setGroupView(v=>v==='join'?'none':'join')} style={{padding:'10px', borderRadius:'14px', border:'1.5px solid var(--glass-border)', background:'var(--glass-bg2)', cursor:'pointer', fontSize:'11px', fontWeight:900, color:'var(--text-sub)', fontFamily:'Pretendard,sans-serif'}}>코드 참여</button>
+                        </div>
+                        {groupView === 'create' && (
+                            <div className="glass-card" style={{padding:'16px'}}>
+                                <p style={{fontSize:'9px',fontWeight:900,opacity:0.4,textTransform:'uppercase',letterSpacing:'0.15em',marginBottom:'10px',color:'var(--text)'}}>그룹 이름</p>
+                                <input autoFocus value={groupName} onChange={e=>setGroupName(e.target.value)} onKeyDown={e=>e.key==='Enter'&&createGroup()} placeholder="예: 3학년 5반" style={{width:'100%', marginBottom:'10px'}} />
+                                <div style={{display:'flex', gap:'8px'}}>
+                                    <button onClick={()=>setGroupView('none')} style={{flex:1,padding:'8px',borderRadius:'12px',border:'1.5px solid var(--glass-border)',background:'var(--glass-bg2)',cursor:'pointer',fontSize:'11px',fontWeight:800,color:'var(--text-sub)',fontFamily:'Pretendard,sans-serif'}}>취소</button>
+                                    <button onClick={createGroup} disabled={!groupName.trim()||groupLoading} className="btn-primary" style={{flex:1,padding:'8px',fontSize:'11px',opacity:!groupName.trim()?0.4:1}}>{groupLoading?'..':'만들기'}</button>
+                                </div>
                             </div>
                         )}
+                        {groupView === 'join' && (
+                            <div className="glass-card" style={{padding:'16px'}}>
+                                <p style={{fontSize:'9px',fontWeight:900,opacity:0.4,textTransform:'uppercase',letterSpacing:'0.15em',marginBottom:'10px',color:'var(--text)'}}>참여 코드</p>
+                                <input autoFocus value={joinCode} onChange={e=>setJoinCode(e.target.value.toUpperCase())} onKeyDown={e=>e.key==='Enter'&&joinGroup()} placeholder="6자리 코드" style={{width:'100%', marginBottom:'10px', fontFamily:'monospace', letterSpacing:'0.2em', textAlign:'center', fontSize:'16px', fontWeight:900}} />
+                                <div style={{display:'flex', gap:'8px'}}>
+                                    <button onClick={()=>setGroupView('none')} style={{flex:1,padding:'8px',borderRadius:'12px',border:'1.5px solid var(--glass-border)',background:'var(--glass-bg2)',cursor:'pointer',fontSize:'11px',fontWeight:800,color:'var(--text-sub)',fontFamily:'Pretendard,sans-serif'}}>취소</button>
+                                    <button onClick={joinGroup} disabled={!joinCode.trim()||groupLoading} className="btn-primary" style={{flex:1,padding:'8px',fontSize:'11px',opacity:!joinCode.trim()?0.4:1}}>{groupLoading?'..':'참여'}</button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+
+            // ── 그룹 있음: 모바일 ─────────────────────────────────────────────
+            if (isMobileUI) return (
+                <div className="anim-fade-up">
+                    {/* 그룹 정보 바 */}
+                    <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'12px', padding:'10px 14px', borderRadius:'14px', background:'var(--glass-bg2)', border:'1px solid var(--glass-border)'}}>
+                        <div style={{display:'flex', alignItems:'center', gap:'10px'}}>
+                            <span style={{fontSize:'18px'}}>📅</span>
+                            <div>
+                                <div style={{fontSize:'13px', fontWeight:900, color:'var(--text)'}}>{calendarGroup.name}</div>
+                                <div style={{fontSize:'10px', fontWeight:800, color:'var(--accent)', fontFamily:'monospace', letterSpacing:'0.15em'}}>코드: {calendarGroup.code}</div>
+                            </div>
+                        </div>
+                        <button onClick={()=>{ if(window.confirm('그룹에서 나가시겠습니까?')) onLeaveGroup(); }}
+                            style={{padding:'6px 12px', borderRadius:'10px', border:'1px solid rgba(239,68,68,0.3)', background:'rgba(239,68,68,0.06)', cursor:'pointer', fontSize:'11px', fontWeight:800, color:'#ef4444', fontFamily:'Pretendard,sans-serif'}}>
+                            나가기
+                        </button>
+                    </div>
+
+                    {/* 달력 */}
+                    <div className="glass-card-lg" style={{padding:'16px'}}>
+                        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'12px'}}>
+                            <div>
+                                <h3 style={{fontSize:'15px', fontWeight:900, color:'var(--text)'}}>🗓️ 공용 달력</h3>
+                                <p style={{fontSize:'10px', fontWeight:700, opacity:0.35, textTransform:'uppercase', letterSpacing:'0.15em', marginTop:'2px'}}>{MONTHS[month]} {year}</p>
+                            </div>
+                            <span style={{fontSize:'10px', fontWeight:800, opacity:0.4, color:'var(--accent)'}}>날짜 탭 → 일정</span>
+                        </div>
+                        <CalGrid />
+                    </div>
+                </div>
+            );
+
+            // ── 그룹 있음: PC ─────────────────────────────────────────────────
+            return (
+                <div className="anim-fade-up" style={{display:'grid', gridTemplateColumns:'1fr 280px', gap:'20px', alignItems:'start'}}>
+                    {/* 달력 */}
+                    <div className="glass-card-lg" style={{padding:'28px 32px'}}>
+                        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'20px'}}>
+                            <div>
+                                <h3 style={{fontSize:'18px', fontWeight:900, color:'var(--text)'}}>🗓️ 공용 달력</h3>
+                                <p style={{fontSize:'10px', fontWeight:700, opacity:0.35, textTransform:'uppercase', letterSpacing:'0.15em', marginTop:'2px'}}>{MONTHS[month]} {year}</p>
+                            </div>
+                            <span style={{fontSize:'10px', fontWeight:800, opacity:0.4, color:'var(--accent)'}}>날짜 클릭 → 일정 추가/조회</span>
+                        </div>
+                        <CalGrid />
+                    </div>
+
+                    {/* 사이드: 그룹 정보 */}
+                    <div style={{display:'flex', flexDirection:'column', gap:'12px'}}>
+                        <div className="glass-card" style={{padding:'20px'}}>
+                            <p style={{fontSize:'9px', fontWeight:900, opacity:0.35, textTransform:'uppercase', letterSpacing:'0.2em', marginBottom:'14px', color:'var(--text)'}}>달력 그룹</p>
+                            <div style={{fontSize:'16px', fontWeight:900, color:'var(--text)', marginBottom:'6px'}}>{calendarGroup.name}</div>
+                            <div style={{display:'flex', alignItems:'center', gap:'8px', marginBottom:'16px'}}>
+                                <span style={{fontSize:'11px', fontWeight:800, color:'var(--accent)', fontFamily:'monospace', letterSpacing:'0.2em', padding:'4px 10px', borderRadius:'8px', background:'rgba(79,110,247,0.1)', border:'1px solid rgba(79,110,247,0.2)'}}>코드: {calendarGroup.code}</span>
+                            </div>
+                            <div style={{fontSize:'11px', fontWeight:700, opacity:0.4, marginBottom:'4px'}}>{(calendarGroup.members||[]).length}명 참여 중</div>
+                            <button onClick={()=>{ if(window.confirm('그룹에서 나가시겠습니까?')) onLeaveGroup(); }}
+                                style={{marginTop:'12px', width:'100%', padding:'10px', borderRadius:'12px', border:'1px solid rgba(239,68,68,0.3)', background:'rgba(239,68,68,0.06)', cursor:'pointer', fontSize:'12px', fontWeight:800, color:'#ef4444', fontFamily:'Pretendard,sans-serif'}}>
+                                그룹 나가기
+                            </button>
+                        </div>
                     </div>
                 </div>
             );
