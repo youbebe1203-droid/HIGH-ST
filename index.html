@@ -1039,7 +1039,7 @@
                 {view === '커뮤니티' && <CommunityView posts={posts} currentUser={currentUser} onAddPost={handleAddPost} />}
                 {view === '공용달력' && <CalendarView isAdmin={canManageSystem} sharedEvents={sharedEvents} onAddEvent={handleAddEvent} onDeleteEvent={handleDeleteEvent} />}
                 {view === '자료실'   && <ResourceView resources={resources} currentUser={currentUser} onAdd={handleAddResource} />}
-                {view === '메시지'   && <MessageView rooms={rooms} currentUser={currentUser} localRoomMessages={localRoomMessages} onCreateRoom={handleCreateRoom} onSendInRoom={handleSendInRoom} />}
+                {view === '메시지'   && <MessageView rooms={rooms} currentUser={currentUser} localRoomMessages={localRoomMessages} onCreateRoom={handleCreateRoom} onSendInRoom={handleSendInRoom} isMobileUI={isMobileUI} />}
                 {view === '설정'     && <SettingsView currentUser={currentUser} userRole={userRole} theme={theme} suneungDate={suneungDate} getDDay={getDDay} onThemeChange={async (t) => { setTheme(t); await saveProfile({ theme: t }); }} onRoleChange={async (r) => { setUserRole(r); await saveProfile({ role: r }); }} onSuneungChange={async (d) => { setSuneungDate(d); await saveProfile({ suneungDate: d }); }} onSchoolChange={async (s) => await saveProfile({ school: s })} onNameChange={async (n) => { await saveProfile({ name: n }); }} />}
             </>);
 
@@ -1590,7 +1590,7 @@
 
             // ── 모바일 레이아웃 (열품타 스타일) ─────────────────────────────────
             if (isMobileUI) return (
-                <div style={{display:'flex', flexDirection:'column', height:'100%', minHeight:'calc(100dvh - 120px)', position:'relative', overflow:'hidden'}}>
+                <div style={{display:'flex', flexDirection:'column', height:'100%', minHeight:'calc(100dvh - 120px)', position:'relative'}}>
 
                     {/* 상태 텍스트 */}
                     <div style={{textAlign:'center', paddingTop:'28px', paddingBottom:'8px'}}>
@@ -1719,9 +1719,10 @@
 
                     {/* 그룹 바텀 시트 */}
                     {showGroupSheet && (
-                        <div style={{position:'fixed', inset:0, zIndex:50, display:'flex', flexDirection:'column', justifyContent:'flex-end'}}
+                        <div style={{position:'fixed', inset:0, zIndex:50, display:'flex', flexDirection:'column', justifyContent:'flex-end', background:'rgba(0,0,0,0.4)'}}
                             onClick={e=>{ if(e.target===e.currentTarget) setShowGroupSheet(false); }}>
-                            <div style={{background:'var(--bg)', borderRadius:'24px 24px 0 0', padding:'20px 16px 32px', maxHeight:'75dvh', overflowY:'auto',
+                            <div onClick={e=>e.stopPropagation()}
+                                style={{background:'var(--bg)', borderRadius:'24px 24px 0 0', padding:'20px 16px 32px', maxHeight:'75dvh', overflowY:'auto', overscrollBehavior:'contain', WebkitOverflowScrolling:'touch',
                                 boxShadow:'0 -8px 40px rgba(0,0,0,0.3)', animation:'slideUp 0.28s cubic-bezier(0.34,1.4,0.64,1)'}}>
                                 <div style={{width:'40px', height:'4px', borderRadius:'99px', background:'var(--glass-border)', margin:'0 auto 20px'}}></div>
                                 <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'16px'}}>
@@ -2868,7 +2869,7 @@
 
         // ─── MessageView ─────────────────────────────────────────────────────
 
-        function MessageView({ rooms, currentUser, localRoomMessages, onCreateRoom, onSendInRoom }) {
+        function MessageView({ rooms, currentUser, localRoomMessages, onCreateRoom, onSendInRoom, isMobileUI }) {
             const [activeRoom,     setActiveRoom]     = useState(null);
             const [roomMessages,   setRoomMessages]   = useState([]);
             const [msgInput,       setMsgInput]       = useState('');
@@ -2939,7 +2940,157 @@
 
             const filteredRooms = rooms.filter(r => getRoomName(r).toLowerCase().includes(roomSearch.toLowerCase()));
 
-            // ── 새 대화 생성 패널 ──
+            // ── 모바일 레이아웃 (Instagram DM 스타일) ──────────────────────────
+            if (isMobileUI) {
+                // 새 대화 생성 바텀 시트
+                const MobCreateSheet = () => showCreate ? (
+                    <div style={{position:'fixed', inset:0, zIndex:60, background:'rgba(0,0,0,0.45)', display:'flex', flexDirection:'column', justifyContent:'flex-end'}}
+                        onClick={e=>{ if(e.target===e.currentTarget){ setShowCreate(false); setCreateIds(''); setCreateName(''); } }}>
+                        <div onClick={e=>e.stopPropagation()}
+                            style={{background:'var(--bg)', borderRadius:'24px 24px 0 0', padding:'20px 20px 40px', overscrollBehavior:'contain', WebkitOverflowScrolling:'touch',
+                                boxShadow:'0 -8px 40px rgba(0,0,0,0.3)', animation:'slideUp 0.25s cubic-bezier(0.34,1.4,0.64,1)'}}>
+                            <div style={{width:'36px', height:'4px', borderRadius:'99px', background:'var(--glass-border)', margin:'0 auto 20px'}}></div>
+                            <h3 style={{fontSize:'18px', fontWeight:900, color:'var(--text)', marginBottom:'4px'}}>새 대화</h3>
+                            <p style={{fontSize:'12px', fontWeight:700, opacity:0.35, marginBottom:'24px'}}>ID를 쉼표로 구분해 입력하세요</p>
+                            <div style={{display:'flex', flexDirection:'column', gap:'12px'}}>
+                                <div>
+                                    <label style={{fontSize:'9px', fontWeight:900, opacity:0.4, textTransform:'uppercase', letterSpacing:'0.18em', display:'block', marginBottom:'8px', color:'var(--text)'}}>참여자 ID *</label>
+                                    <input autoFocus value={createIds} onChange={e=>setCreateIds(e.target.value)}
+                                        onKeyDown={e=>e.key==='Enter'&&createRoom()}
+                                        placeholder="예: user1 또는 user1, user2"
+                                        style={{width:'100%', fontSize:'14px', fontWeight:700}} />
+                                </div>
+                                <div>
+                                    <label style={{fontSize:'9px', fontWeight:900, opacity:0.4, textTransform:'uppercase', letterSpacing:'0.18em', display:'block', marginBottom:'8px', color:'var(--text)'}}>대화방 이름 (선택)</label>
+                                    <input value={createName} onChange={e=>setCreateName(e.target.value)}
+                                        onKeyDown={e=>e.key==='Enter'&&createRoom()}
+                                        placeholder="그룹 이름 (비우면 자동)"
+                                        style={{width:'100%', fontSize:'14px', fontWeight:700}} />
+                                </div>
+                                <div style={{display:'flex', gap:'10px', marginTop:'4px'}}>
+                                    <button onClick={()=>{setShowCreate(false);setCreateIds('');setCreateName('');}}
+                                        style={{flex:1, padding:'13px', borderRadius:'16px', border:'1.5px solid var(--glass-border)', background:'var(--glass-bg2)', cursor:'pointer', fontSize:'13px', fontWeight:800, color:'var(--text-sub)', fontFamily:'Pretendard,sans-serif'}}>취소</button>
+                                    <button onClick={createRoom} disabled={creating||!createIds.trim()} className="btn-primary" style={{flex:1, padding:'13px', opacity:!createIds.trim()?0.4:1}}>
+                                        {creating ? '생성 중...' : '대화 시작'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                ) : null;
+
+                // ── 채팅 화면 (방 선택됨) ──
+                if (activeRoom) return (
+                    <div style={{display:'flex', flexDirection:'column', height:'100%', minHeight:'calc(100dvh - 120px)'}}>
+                        {/* 채팅 헤더 */}
+                        <div style={{display:'flex', alignItems:'center', gap:'12px', padding:'14px 16px', borderBottom:'1px solid var(--glass-border)', background:'var(--glass-bg2)', flexShrink:0}}>
+                            <button onClick={()=>setActiveRoom(null)}
+                                style={{background:'none', border:'none', cursor:'pointer', fontSize:'22px', color:'var(--text)', padding:'0 4px', lineHeight:1, display:'flex', alignItems:'center'}}>‹</button>
+                            <div style={{width:'36px', height:'36px', borderRadius:'50%', background:'linear-gradient(135deg, var(--accent), var(--accent2))', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'14px', fontWeight:900, color:'#fff', flexShrink:0}}>
+                                {getRoomInitial(activeRoom)}
+                            </div>
+                            <div style={{flex:1, minWidth:0}}>
+                                <div style={{fontSize:'15px', fontWeight:900, color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{getRoomName(activeRoom)}</div>
+                                {activeRoom.memberIds && <div style={{fontSize:'10px', fontWeight:700, opacity:0.35, marginTop:'1px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{activeRoom.memberIds.join(' · ')}</div>}
+                            </div>
+                        </div>
+
+                        {/* 메시지 영역 */}
+                        <div style={{flex:1, overflowY:'auto', padding:'16px', display:'flex', flexDirection:'column', gap:'6px', WebkitOverflowScrolling:'touch'}}>
+                            {roomMessages.length === 0 && (
+                                <div style={{flex:1, display:'flex', alignItems:'center', justifyContent:'center', fontSize:'12px', fontWeight:700, opacity:0.15, textTransform:'uppercase', letterSpacing:'0.15em'}}>대화를 시작해보세요</div>
+                            )}
+                            {roomMessages.map((m, i) => {
+                                const isMine = m.fromUid === currentUser.uid || m.fromId === currentUser.id;
+                                const prevMsg = roomMessages[i-1];
+                                const sameAuthor = prevMsg && (prevMsg.fromId === m.fromId);
+                                return (
+                                    <div key={m.id||i} style={{display:'flex', flexDirection:isMine?'row-reverse':'row', alignItems:'flex-end', gap:'8px', marginTop:sameAuthor?'2px':'12px'}}>
+                                        {!isMine && (
+                                            <div style={{width:'26px', height:'26px', borderRadius:'50%', background:'var(--glass-bg)', border:'1px solid var(--glass-border)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'10px', fontWeight:900, flexShrink:0, opacity:sameAuthor?0:1}}>
+                                                {m.fromName?.[0]||'?'}
+                                            </div>
+                                        )}
+                                        <div style={{display:'flex', flexDirection:'column', alignItems:isMine?'flex-end':'flex-start', maxWidth:'72%'}}>
+                                            {!isMine && !sameAuthor && <span style={{fontSize:'10px', fontWeight:800, opacity:0.45, marginBottom:'4px', marginLeft:'4px'}}>{m.fromName}</span>}
+                                            <div style={{padding:'10px 14px', borderRadius:isMine?'18px 18px 4px 18px':'18px 18px 18px 4px',
+                                                background:isMine?'linear-gradient(135deg, var(--accent), var(--accent2))':'var(--glass-bg)',
+                                                border:isMine?'none':'1px solid var(--glass-border)',
+                                                boxShadow:isMine?'0 2px 12px rgba(79,110,247,0.3)':'var(--card-shadow)'}}>
+                                                <div style={{fontSize:'14px', fontWeight:600, lineHeight:1.5, color:isMine?'#fff':'var(--text)', wordBreak:'break-word'}}>{m.text}</div>
+                                            </div>
+                                            <span style={{fontSize:'9px', fontWeight:700, opacity:0.3, marginTop:'3px', marginLeft:'4px', marginRight:'4px'}}>{m.time}</span>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                            <div ref={msgEndRef} />
+                        </div>
+
+                        {/* 입력바 */}
+                        <div style={{padding:'10px 12px', borderTop:'1px solid var(--glass-border)', display:'flex', gap:'8px', alignItems:'flex-end', background:'var(--glass-bg2)', flexShrink:0}}>
+                            <textarea ref={inputRef}
+                                value={msgInput} onChange={e=>setMsgInput(e.target.value)}
+                                onKeyDown={e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); sendMsg(); } }}
+                                placeholder="메시지 입력…"
+                                rows={1}
+                                style={{flex:1, resize:'none', fontSize:'14px', fontWeight:600, lineHeight:1.5, background:'var(--glass-bg)', border:'1.5px solid var(--glass-border)', borderRadius:'22px', padding:'10px 16px', color:'var(--text)', fontFamily:'Pretendard,sans-serif', outline:'none', maxHeight:'100px', overflowY:'auto'}}
+                                onInput={e=>{ e.target.style.height='auto'; e.target.style.height=Math.min(e.target.scrollHeight,100)+'px'; }}
+                            />
+                            <button onClick={sendMsg} disabled={sending||!msgInput.trim()}
+                                style={{width:'40px', height:'40px', borderRadius:'50%', border:'none', cursor:'pointer', background:msgInput.trim()?'var(--accent)':'var(--glass-bg)', color:msgInput.trim()?'#fff':'var(--text-sub)', fontSize:'18px', display:'flex', alignItems:'center', justifyContent:'center', transition:'all 0.15s', flexShrink:0, boxShadow:msgInput.trim()?'0 4px 12px rgba(79,110,247,0.35)':'none', opacity:sending?0.6:1}}>↑</button>
+                        </div>
+                        <MobCreateSheet />
+                    </div>
+                );
+
+                // ── 대화 목록 화면 ──
+                return (
+                    <div style={{display:'flex', flexDirection:'column', height:'100%', minHeight:'calc(100dvh - 120px)'}}>
+                        {/* 헤더: 유저 ID + 새 대화 */}
+                        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', padding:'18px 20px 10px'}}>
+                            <span style={{fontSize:'22px', fontWeight:900, color:'var(--text)', letterSpacing:'-0.5px'}}>{currentUser.id}</span>
+                            <button onClick={()=>setShowCreate(true)}
+                                style={{width:'36px', height:'36px', borderRadius:'12px', border:'1.5px solid var(--glass-border)', background:'var(--glass-bg)', cursor:'pointer', fontSize:'18px', color:'var(--accent)', display:'flex', alignItems:'center', justifyContent:'center'}}>✏️</button>
+                        </div>
+
+                        {/* 검색창 */}
+                        <div style={{padding:'0 16px 14px'}}>
+                            <input value={roomSearch} onChange={e=>setRoomSearch(e.target.value)}
+                                placeholder="검색"
+                                style={{width:'100%', fontSize:'14px', fontWeight:600, padding:'10px 16px', borderRadius:'14px', background:'var(--glass-bg2)', border:'1px solid var(--glass-border)'}} />
+                        </div>
+
+                        {/* 대화 목록 */}
+                        <div style={{flex:1, overflowY:'auto', WebkitOverflowScrolling:'touch'}}>
+                            {filteredRooms.length === 0 && (
+                                <div style={{padding:'48px 20px', textAlign:'center', fontSize:'13px', fontWeight:700, opacity:0.2}}>
+                                    {roomSearch ? '검색 결과 없음' : '대화가 없습니다'}
+                                </div>
+                            )}
+                            {filteredRooms.map(room => {
+                                const isActive = activeRoom?.id === room.id;
+                                return (
+                                    <div key={room.id} onClick={()=>{ setActiveRoom(room); setShowCreate(false); }}
+                                        style={{display:'flex', alignItems:'center', gap:'14px', padding:'12px 20px', cursor:'pointer', background:isActive?'rgba(79,110,247,0.06)':'transparent', transition:'background 0.15s'}}>
+                                        {/* 아바타 */}
+                                        <div style={{width:'52px', height:'52px', borderRadius:'50%', background:'linear-gradient(135deg, var(--accent), var(--accent2))', display:'flex', alignItems:'center', justifyContent:'center', fontSize:room.isGroup?'20px':'18px', fontWeight:900, color:'#fff', flexShrink:0}}>
+                                            {getRoomInitial(room)}
+                                        </div>
+                                        <div style={{flex:1, minWidth:0}}>
+                                            <div style={{fontSize:'15px', fontWeight:800, color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{getRoomName(room)}</div>
+                                            <div style={{fontSize:'12px', fontWeight:500, opacity:0.4, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', marginTop:'2px'}}>{room.lastMessage || '대화를 시작하세요'}</div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                        <MobCreateSheet />
+                    </div>
+                );
+            }
+
+            // ── 데스크톱 레이아웃 ─────────────────────────────────────────────
             return (
                 <div className="anim-fade-up" style={{display:'flex', height:'calc(100vh - 140px)', borderRadius:'24px', overflow:'hidden', border:'1px solid var(--glass-border)', background:'var(--glass-bg)', backdropFilter:'blur(28px) saturate(180%)', WebkitBackdropFilter:'blur(28px) saturate(180%)', boxShadow:'var(--glass-shadow)'}}>
 
