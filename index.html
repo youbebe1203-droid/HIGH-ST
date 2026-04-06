@@ -561,6 +561,16 @@
             transition: all 0.2s;
         }
         .cal-cell:hover { background: var(--glass-bg); transform: scale(1.04); z-index: 2; box-shadow: 0 8px 24px rgba(0,0,0,0.1); }
+        .cal-cell-mob {
+            min-height: 0;
+            aspect-ratio: 1 / 1;
+            padding: 3px 2px;
+            border-radius: 8px;
+            border: 1px solid var(--glass-border);
+            background: var(--glass-bg2);
+            transition: background 0.15s;
+            overflow: hidden;
+        }
 
         /* ── 메시지 버블 ─────────────────────────────────────── */
         .msg-bubble-out { animation: slideInRight 0.3s ease both; }
@@ -2489,17 +2499,12 @@
                                 return (
                                     <div
                                         key={i}
-                                        className={d ? 'cal-cell' : ''}
+                                        className={d ? (isMobileUI ? 'cal-cell-mob' : 'cal-cell') : ''}
                                         style={{
-                                            /* 정사각형: aspectRatio로 높이를 너비와 동일하게 고정 */
-                                            aspectRatio: isMobileUI ? '1/1' : undefined,
-                                            minHeight: isMobileUI ? undefined : '80px',
-                                            overflow: 'hidden',
                                             cursor: d&&isAdmin ? 'pointer' : 'default',
                                             opacity: d ? 1 : 0,
                                             border: isToday ? '2px solid var(--accent)' : undefined,
                                             background: isToday ? 'rgba(79,110,247,0.08)' : undefined,
-                                            padding: isMobileUI ? '3px 2px' : undefined,
                                         }}
                                         onClick={() => clickDay(d)}>
                                         {d && <>
