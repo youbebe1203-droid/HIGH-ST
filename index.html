@@ -1045,17 +1045,35 @@
             // ── 모바일 / 태블릿 레이아웃 ────────────────────────────────────
             if (isMobileUI) return (
                 <div style={{display:'flex', flexDirection:'column', height:'100dvh', width:'100vw', overflow:'hidden'}}>
-                    <header className="mobile-header">
-                        <div style={{fontSize:'20px', fontWeight:900, letterSpacing:'-0.5px', color:'var(--text)'}}>
-                            HIGH.<span style={{color:'var(--accent)'}}>ST</span>
-                        </div>
-                        <div style={{display:'flex', alignItems:'center', gap:'10px'}}>
-                            <div style={{textAlign:'right'}}>
-                                <div style={{fontSize:'12px', fontWeight:900, color:'var(--accent)'}}>{getDDay(suneungDate)}</div>
-                                <div style={{fontSize:'9px', fontWeight:700, opacity:0.35}}>수능까지</div>
+                    <header className="mobile-header" style={{flexDirection:'column', alignItems:'stretch', gap:'2px', padding:'12px 16px 10px'}}>
+                        <div style={{display:'flex', alignItems:'center', justifyContent:'space-between'}}>
+                            <div onClick={()=>goView('대시보드')} style={{cursor:'pointer', userSelect:'none'}}>
+                                <div style={{fontSize:'18px', fontWeight:900, letterSpacing:'-0.5px', color:'var(--text)', lineHeight:1}}>
+                                    HIGH.<span style={{color:'var(--accent)'}}>ST</span>
+                                </div>
+                                <div style={{fontSize:'12px', fontWeight:700, color:'var(--text)', opacity:0.75, marginTop:'3px', letterSpacing:'-0.2px'}}>
+                                    {(()=>{
+                                        const h = new Date().getHours();
+                                        const n = currentUser.name;
+                                        const greets = h>=5&&h<9   ? [`좋은 아침이에요, ${n}님 ☀️`,`오늘도 화이팅이에요, ${n}님 🌅`]
+                                                     : h>=9&&h<12  ? [`오전 공부 시작해볼까요, ${n}님 📖`,`집중할 시간이에요, ${n}님 ⚡`]
+                                                     : h>=12&&h<14 ? [`점심 시간이네요, ${n}님 🍱`,`잠깐 쉬어가요, ${n}님 😌`]
+                                                     : h>=14&&h<18 ? [`오후도 힘내요, ${n}님 💪`,`조금만 더, ${n}님 🔥`]
+                                                     : h>=18&&h<21 ? [`좋은 저녁이에요, ${n}님 🌆`,`오늘 하루 어땠나요, ${n}님 ✨`]
+                                                     : h>=21&&h<24 ? [`오늘 수고했어요, ${n}님 🌙`,`내일도 화이팅이에요, ${n}님 ⭐`]
+                                                     :               [`늦은 밤이네요, ${n}님 🌌`,`몸 챙기면서 공부해요, ${n}님 💙`];
+                                        return greets[Math.floor(Math.random()*greets.length)];
+                                    })()}
+                                </div>
                             </div>
-                            <div style={{width:'34px', height:'34px', borderRadius:'11px', background:'linear-gradient(135deg, var(--accent), var(--accent2))', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'16px'}}>🎓</div>
-                            <button onClick={handleLogout} style={{fontSize:'11px', fontWeight:800, color:'var(--text-sub)', opacity:0.4, background:'none', border:'none', cursor:'pointer', fontFamily:'Pretendard,sans-serif', padding:'4px'}}>나가기</button>
+                            <div style={{display:'flex', alignItems:'center', gap:'8px'}}>
+                                <div style={{textAlign:'right'}}>
+                                    <div style={{fontSize:'12px', fontWeight:900, color:'var(--accent)'}}>{getDDay(suneungDate)}</div>
+                                    <div style={{fontSize:'8px', fontWeight:700, opacity:0.35}}>수능까지</div>
+                                </div>
+                                <div style={{width:'32px', height:'32px', borderRadius:'10px', background:'linear-gradient(135deg, var(--accent), var(--accent2))', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'15px'}}>🎓</div>
+                                <button onClick={handleLogout} style={{fontSize:'10px', fontWeight:800, color:'var(--text-sub)', opacity:0.35, background:'none', border:'none', cursor:'pointer', fontFamily:'Pretendard,sans-serif', padding:'2px'}}>나가기</button>
+                            </div>
                         </div>
                     </header>
 
@@ -1119,7 +1137,10 @@
                     {/* ── 사이드바 ─────────────────────────────────────── */}
                     <aside className="sidebar">
                         {/* 로고 */}
-                        <div style={{fontSize:'22px', fontWeight:900, letterSpacing:'-0.5px', marginBottom:'24px', paddingLeft:'8px', color:'var(--text)'}}>
+                        <div onClick={()=>setView('대시보드')}
+                            style={{fontSize:'22px', fontWeight:900, letterSpacing:'-0.5px', marginBottom:'24px', paddingLeft:'8px', color:'var(--text)', cursor:'pointer', userSelect:'none', transition:'opacity 0.15s'}}
+                            onMouseEnter={e=>e.currentTarget.style.opacity='0.7'}
+                            onMouseLeave={e=>e.currentTarget.style.opacity='1'}>
                             HIGH.<span style={{color:'var(--accent)'}}>ST</span>
                         </div>
 
