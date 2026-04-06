@@ -1057,18 +1057,7 @@
                                     HIGH.<span style={{color:'var(--accent)'}}>ST</span>
                                 </div>
                                 <div style={{fontSize:'12px', fontWeight:700, color:'var(--text)', opacity:0.75, marginTop:'3px', letterSpacing:'-0.2px'}}>
-                                    {(()=>{
-                                        const h = new Date().getHours();
-                                        const n = currentUser.name;
-                                        const greets = h>=5&&h<9   ? [`좋은 아침이에요, ${n}님 ☀️`,`오늘도 화이팅이에요, ${n}님 🌅`]
-                                                     : h>=9&&h<12  ? [`오전 공부 시작해볼까요, ${n}님 📖`,`집중할 시간이에요, ${n}님 ⚡`]
-                                                     : h>=12&&h<14 ? [`점심 시간이네요, ${n}님 🍱`,`잠깐 쉬어가요, ${n}님 😌`]
-                                                     : h>=14&&h<18 ? [`오후도 힘내요, ${n}님 💪`,`조금만 더, ${n}님 🔥`]
-                                                     : h>=18&&h<21 ? [`좋은 저녁이에요, ${n}님 🌆`,`오늘 하루 어땠나요, ${n}님 ✨`]
-                                                     : h>=21&&h<24 ? [`오늘 수고했어요, ${n}님 🌙`,`내일도 화이팅이에요, ${n}님 ⭐`]
-                                                     :               [`늦은 밤이네요, ${n}님 🌌`,`몸 챙기면서 공부해요, ${n}님 💙`];
-                                        return greets[Math.floor(Math.random()*greets.length)];
-                                    })()}
+                                    하이스트와 함께 효율적인 학습!
                                 </div>
                             </div>
                             <div style={{display:'flex', alignItems:'center', gap:'8px'}}>
