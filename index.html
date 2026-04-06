@@ -598,6 +598,41 @@
             { id: '기타', icon: '📚', color: '#8b5cf6' },
         ];
 
+        // ─── Korean IME-safe input components ────────────────────────────────
+        // React controlled inputs break Korean IME (composition resets on re-render).
+        // These components buffer the value locally and only flush to state after
+        // composition ends (onCompositionEnd), preventing mid-syllable breakage.
+
+        function KorInput({ value, onChange, type, ...rest }) {
+            const composing = React.useRef(false);
+            const [inner, setInner] = React.useState(value ?? '');
+            React.useEffect(() => { if (!composing.current) setInner(value ?? ''); }, [value]);
+            // Non-text types (number, file, checkbox, radio…) pass through unchanged
+            if (type && !['text','search','url','email','password','tel'].includes(type)) {
+                return <input type={type} value={value} onChange={onChange} {...rest} />;
+            }
+            return (
+                <input type={type} {...rest} value={inner}
+                    onChange={e => { setInner(e.target.value); if (!composing.current && onChange) onChange(e); }}
+                    onCompositionStart={() => { composing.current = true; }}
+                    onCompositionEnd={e => { composing.current = false; setInner(e.target.value); if (onChange) onChange(e); }}
+                />
+            );
+        }
+
+        function KorTextarea({ value, onChange, ...rest }) {
+            const composing = React.useRef(false);
+            const [inner, setInner] = React.useState(value ?? '');
+            React.useEffect(() => { if (!composing.current) setInner(value ?? ''); }, [value]);
+            return (
+                <textarea {...rest} value={inner}
+                    onChange={e => { setInner(e.target.value); if (!composing.current && onChange) onChange(e); }}
+                    onCompositionStart={() => { composing.current = true; }}
+                    onCompositionEnd={e => { composing.current = false; setInner(e.target.value); if (onChange) onChange(e); }}
+                />
+            );
+        }
+
         // ─── App ─────────────────────────────────────────────────────────────
 
         function App() {
@@ -1516,9 +1551,9 @@
                 <div style={{padding:'16px', borderRadius:'16px', border:'1.5px solid var(--glass-border)', background:'var(--glass-bg2)', marginTop:'10px'}}>
                     <p style={{fontSize:'9px', fontWeight:900, opacity:0.4, textTransform:'uppercase', letterSpacing:'0.2em', marginBottom:'12px', color:'var(--text)'}}>새 과목 추가</p>
                     <div style={{display:'flex', gap:'8px', marginBottom:'10px'}}>
-                        <input value={newSubjectIcon} onChange={e=>setNewSubjectIcon(e.target.value)} placeholder="😀" maxLength={2}
+                        <KorInput value={newSubjectIcon} onChange={e=>setNewSubjectIcon(e.target.value)} placeholder="😀" maxLength={2}
                             style={{width:'52px', textAlign:'center', fontSize:'20px', padding:'6px', borderRadius:'10px', flexShrink:0}} />
-                        <input autoFocus value={newSubjectName} onChange={e=>setNewSubjectName(e.target.value)}
+                        <KorInput autoFocus value={newSubjectName} onChange={e=>setNewSubjectName(e.target.value)}
                             onKeyDown={e=>e.key==='Enter'&&saveCustomSubject()} placeholder="과목 이름" style={{flex:1}} />
                     </div>
                     <div style={{display:'flex', gap:'6px', flexWrap:'wrap', marginBottom:'12px'}}>
@@ -1600,7 +1635,7 @@
                 {showCreate && (
                     <div className="glass-card" style={{padding:'16px', marginBottom:'8px'}}>
                         <p style={{fontSize:'9px',fontWeight:900,opacity:0.4,textTransform:'uppercase',letterSpacing:'0.15em',marginBottom:'10px',color:'var(--text)'}}>새 그룹 이름</p>
-                        <input autoFocus value={newGroupName} onChange={e=>setNewGroupName(e.target.value)} onKeyDown={e=>e.key==='Enter'&&createGroup()} placeholder="그룹 이름" style={{width:'100%', marginBottom:'10px'}} />
+                        <KorInput autoFocus value={newGroupName} onChange={e=>setNewGroupName(e.target.value)} onKeyDown={e=>e.key==='Enter'&&createGroup()} placeholder="그룹 이름" style={{width:'100%', marginBottom:'10px'}} />
                         <div style={{display:'flex', gap:'8px'}}>
                             <button onClick={()=>setShowCreate(false)} style={{flex:1,padding:'8px',borderRadius:'12px',border:'1.5px solid var(--glass-border)',background:'var(--glass-bg2)',cursor:'pointer',fontSize:'11px',fontWeight:800,color:'var(--text-sub)',fontFamily:'Pretendard,sans-serif'}}>취소</button>
                             <button onClick={createGroup} disabled={creating||!newGroupName.trim()} className="btn-primary" style={{flex:1,padding:'8px',fontSize:'11px',opacity:!newGroupName.trim()?0.4:1}}>{creating?'..':'만들기'}</button>
@@ -1610,7 +1645,7 @@
                 {showJoin && (
                     <div className="glass-card" style={{padding:'16px', marginBottom:'8px'}}>
                         <p style={{fontSize:'9px',fontWeight:900,opacity:0.4,textTransform:'uppercase',letterSpacing:'0.15em',marginBottom:'10px',color:'var(--text)'}}>참여 코드 (6자리)</p>
-                        <input autoFocus value={joinCode} onChange={e=>setJoinCode(e.target.value.toUpperCase())} onKeyDown={e=>e.key==='Enter'&&joinGroup()} placeholder="XXXXXX" style={{width:'100%', marginBottom:'10px', fontFamily:'monospace', letterSpacing:'0.25em', textAlign:'center'}} />
+                        <KorInput autoFocus value={joinCode} onChange={e=>setJoinCode(e.target.value.toUpperCase())} onKeyDown={e=>e.key==='Enter'&&joinGroup()} placeholder="XXXXXX" style={{width:'100%', marginBottom:'10px', fontFamily:'monospace', letterSpacing:'0.25em', textAlign:'center'}} />
                         <div style={{display:'flex', gap:'8px'}}>
                             <button onClick={()=>setShowJoin(false)} style={{flex:1,padding:'8px',borderRadius:'12px',border:'1.5px solid var(--glass-border)',background:'var(--glass-bg2)',cursor:'pointer',fontSize:'11px',fontWeight:800,color:'var(--text-sub)',fontFamily:'Pretendard,sans-serif'}}>취소</button>
                             <button onClick={joinGroup} disabled={joining||!joinCode.trim()} className="btn-primary" style={{flex:1,padding:'8px',fontSize:'11px',opacity:!joinCode.trim()?0.4:1}}>{joining?'..':'참여'}</button>
@@ -1715,7 +1750,7 @@
                                     <select value={forceSubject} onChange={e=>setForceSubject(e.target.value)} style={{flex:'0 0 auto', padding:'8px 10px', borderRadius:'10px', background:'var(--glass-bg2)', border:'1.5px solid var(--glass-border)', color:'var(--text)', fontFamily:'Pretendard,sans-serif', fontWeight:800, fontSize:'11px', cursor:'pointer'}}>
                                         {allSubjects.map(s => <option key={s.id} value={s.id}>{s.icon} {s.id}</option>)}
                                     </select>
-                                    <input type="number" min="1" max="600" value={forceMinutes} onChange={e=>setForceMinutes(e.target.value)} onKeyDown={e=>e.key==='Enter'&&forceAddTime()} placeholder="분" style={{flex:1, fontSize:'13px', fontWeight:800, textAlign:'center'}} />
+                                    <KorInput type="number" min="1" max="600" value={forceMinutes} onChange={e=>setForceMinutes(e.target.value)} onKeyDown={e=>e.key==='Enter'&&forceAddTime()} placeholder="분" style={{flex:1, fontSize:'13px', fontWeight:800, textAlign:'center'}} />
                                     <button onClick={forceAddTime} disabled={!forceMinutes||parseInt(forceMinutes)<=0} style={{flexShrink:0, padding:'8px 14px', borderRadius:'10px', border:'none', cursor:'pointer', fontWeight:900, fontSize:'12px', fontFamily:'Pretendard,sans-serif', color:'#000', background:'#f59e0b', opacity:!forceMinutes?0.4:1}}>추가</button>
                                 </div>
                             </div>
@@ -1911,7 +1946,7 @@
                                                 style={{flex:'0 0 auto', padding:'9px 12px', borderRadius:'12px', background:'var(--glass-bg2)', border:'1.5px solid var(--glass-border)', color:'var(--text)', fontFamily:'Pretendard,sans-serif', fontWeight:800, fontSize:'12px', cursor:'pointer'}}>
                                                 {allSubjects.map(s => <option key={s.id} value={s.id}>{s.icon} {s.id}</option>)}
                                             </select>
-                                            <input type="number" min="1" max="600" value={forceMinutes} onChange={e=>setForceMinutes(e.target.value)}
+                                            <KorInput type="number" min="1" max="600" value={forceMinutes} onChange={e=>setForceMinutes(e.target.value)}
                                                 onKeyDown={e=>e.key==='Enter'&&forceAddTime()}
                                                 placeholder="분 입력"
                                                 style={{flex:1, fontSize:'13px', fontWeight:800, textAlign:'center'}} />
@@ -1962,7 +1997,7 @@
                                     </div>
                                 )}
                                 <div style={{display:'flex', gap:'8px', marginBottom:'12px'}}>
-                                    <input id="study-todo-input" placeholder="⏎  새 목표 입력 후 Enter" style={{flex:1, fontSize:'13px'}}
+                                    <KorInput id="study-todo-input" placeholder="⏎  새 목표 입력 후 Enter" style={{flex:1, fontSize:'13px'}}
                                         onKeyDown={async e=>{if(e.key==='Enter'&&e.target.value.trim()){await onAddTodo(e.target.value.trim(),today);e.target.value='';}}} />
                                 </div>
                                 <div style={{display:'flex', flexDirection:'column', gap:'6px', maxHeight:'240px', overflowY:'auto'}}>
@@ -2249,7 +2284,7 @@
 
                         {/* 댓글 입력 */}
                         <div style={{display:'flex', gap:'10px', alignItems:'flex-end'}}>
-                            <textarea
+                            <KorTextarea
                                 value={commentInput}
                                 onChange={e=>setCommentInput(e.target.value)}
                                 onKeyDown={e=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); submitComment(); } }}
@@ -2306,7 +2341,7 @@
                         {/* 본문 */}
                         <div style={{marginBottom:'24px'}}>
                             <p style={{fontSize:'9px', fontWeight:900, opacity:0.35, textTransform:'uppercase', letterSpacing:'0.2em', marginBottom:'8px', color:'var(--text)'}}>Content</p>
-                            <textarea
+                            <KorTextarea
                                 value={wContent} onChange={e=>setWContent(e.target.value)}
                                 placeholder="내용을 입력하세요..."
                                 rows={10}
@@ -2404,8 +2439,8 @@
                         <div className="glass-card" style={{padding:'24px 28px', marginBottom:'16px'}}>
                             <h4 style={{fontSize:'14px', fontWeight:900, color:'var(--text)', marginBottom:'18px'}}>📢 공지 작성</h4>
                             <div style={{display:'flex', flexDirection:'column', gap:'12px'}}>
-                                <input value={title} onChange={e=>setTitle(e.target.value)} placeholder="공지 제목" style={{fontSize:'15px', fontWeight:800}} />
-                                <textarea value={content} onChange={e=>setContent(e.target.value)} placeholder="공지 내용을 입력하세요..." rows={5}
+                                <KorInput value={title} onChange={e=>setTitle(e.target.value)} placeholder="공지 제목" style={{fontSize:'15px', fontWeight:800}} />
+                                <KorTextarea value={content} onChange={e=>setContent(e.target.value)} placeholder="공지 내용을 입력하세요..." rows={5}
                                     style={{resize:'vertical', fontSize:'13px', fontWeight:600, lineHeight:1.7, background:'var(--glass-bg2)', border:'1.5px solid var(--glass-border)', borderRadius:'16px', padding:'14px 18px', color:'var(--text)', fontFamily:'Pretendard,sans-serif', outline:'none'}}
                                     onFocus={e=>{e.target.style.borderColor='var(--accent)';}} onBlur={e=>{e.target.style.borderColor='var(--glass-border)';}} />
                                 <div style={{display:'flex', gap:'10px', justifyContent:'flex-end'}}>
@@ -2469,7 +2504,7 @@
                                 {filtered.length > 0 ? `${done}/${filtered.length} 완료 · ${progress}%` : '오늘의 목표를 추가해보세요'}
                             </div>
                         </div>
-                        <input type="date" value={selectedDate} onChange={e=>setSelectedDate(e.target.value)} />
+                        <KorInput type="date" value={selectedDate} onChange={e=>setSelectedDate(e.target.value)} />
                     </div>
 
                     {/* 프로그레스 바 */}
@@ -2635,7 +2670,7 @@
                                 ) : <div style={{fontSize:'11px', opacity:0.3, marginBottom:'10px', fontWeight:700}}>등록된 일정이 없습니다</div>;
                             })()}
                             <div style={{display:'flex', gap:'8px'}}>
-                                <input autoFocus value={eventText} onChange={e=>setEventText(e.target.value)}
+                                <KorInput autoFocus value={eventText} onChange={e=>setEventText(e.target.value)}
                                     onKeyDown={e=>{ if(e.key==='Enter') confirmEvent(); if(e.key==='Escape') setAddingDay(null); }}
                                     placeholder="새 일정 입력 후 추가"
                                     style={{flex:1, fontSize:'13px', fontWeight:700}} />
@@ -2670,7 +2705,7 @@
                     {groupView === 'create' && (
                         <div style={{width:'100%', maxWidth:'320px', display:'flex', flexDirection:'column', gap:'12px'}}>
                             <p style={{fontSize:'11px', fontWeight:900, opacity:0.4, textTransform:'uppercase', letterSpacing:'0.15em', color:'var(--text)'}}>그룹 이름</p>
-                            <input autoFocus value={groupName} onChange={e=>setGroupName(e.target.value)}
+                            <KorInput autoFocus value={groupName} onChange={e=>setGroupName(e.target.value)}
                                 onKeyDown={e=>e.key==='Enter'&&createGroup()}
                                 placeholder="예: 3학년 5반" style={{width:'100%', fontSize:'14px', fontWeight:700}} />
                             <div style={{display:'flex', gap:'8px'}}>
@@ -2683,7 +2718,7 @@
                     {groupView === 'join' && (
                         <div style={{width:'100%', maxWidth:'320px', display:'flex', flexDirection:'column', gap:'12px'}}>
                             <p style={{fontSize:'11px', fontWeight:900, opacity:0.4, textTransform:'uppercase', letterSpacing:'0.15em', color:'var(--text)'}}>참여 코드</p>
-                            <input autoFocus value={joinCode} onChange={e=>setJoinCode(e.target.value.toUpperCase())}
+                            <KorInput autoFocus value={joinCode} onChange={e=>setJoinCode(e.target.value.toUpperCase())}
                                 onKeyDown={e=>e.key==='Enter'&&joinGroup()}
                                 placeholder="6자리 코드" style={{width:'100%', fontSize:'18px', fontWeight:900, textAlign:'center', letterSpacing:'0.3em', fontFamily:'monospace'}} />
                             <div style={{display:'flex', gap:'8px'}}>
@@ -2713,7 +2748,7 @@
                         {groupView === 'create' && (
                             <div className="glass-card" style={{padding:'16px'}}>
                                 <p style={{fontSize:'9px',fontWeight:900,opacity:0.4,textTransform:'uppercase',letterSpacing:'0.15em',marginBottom:'10px',color:'var(--text)'}}>그룹 이름</p>
-                                <input autoFocus value={groupName} onChange={e=>setGroupName(e.target.value)} onKeyDown={e=>e.key==='Enter'&&createGroup()} placeholder="예: 3학년 5반" style={{width:'100%', marginBottom:'10px'}} />
+                                <KorInput autoFocus value={groupName} onChange={e=>setGroupName(e.target.value)} onKeyDown={e=>e.key==='Enter'&&createGroup()} placeholder="예: 3학년 5반" style={{width:'100%', marginBottom:'10px'}} />
                                 <div style={{display:'flex', gap:'8px'}}>
                                     <button onClick={()=>setGroupView('none')} style={{flex:1,padding:'8px',borderRadius:'12px',border:'1.5px solid var(--glass-border)',background:'var(--glass-bg2)',cursor:'pointer',fontSize:'11px',fontWeight:800,color:'var(--text-sub)',fontFamily:'Pretendard,sans-serif'}}>취소</button>
                                     <button onClick={createGroup} disabled={!groupName.trim()||groupLoading} className="btn-primary" style={{flex:1,padding:'8px',fontSize:'11px',opacity:!groupName.trim()?0.4:1}}>{groupLoading?'..':'만들기'}</button>
@@ -2723,7 +2758,7 @@
                         {groupView === 'join' && (
                             <div className="glass-card" style={{padding:'16px'}}>
                                 <p style={{fontSize:'9px',fontWeight:900,opacity:0.4,textTransform:'uppercase',letterSpacing:'0.15em',marginBottom:'10px',color:'var(--text)'}}>참여 코드</p>
-                                <input autoFocus value={joinCode} onChange={e=>setJoinCode(e.target.value.toUpperCase())} onKeyDown={e=>e.key==='Enter'&&joinGroup()} placeholder="6자리 코드" style={{width:'100%', marginBottom:'10px', fontFamily:'monospace', letterSpacing:'0.2em', textAlign:'center', fontSize:'16px', fontWeight:900}} />
+                                <KorInput autoFocus value={joinCode} onChange={e=>setJoinCode(e.target.value.toUpperCase())} onKeyDown={e=>e.key==='Enter'&&joinGroup()} placeholder="6자리 코드" style={{width:'100%', marginBottom:'10px', fontFamily:'monospace', letterSpacing:'0.2em', textAlign:'center', fontSize:'16px', fontWeight:900}} />
                                 <div style={{display:'flex', gap:'8px'}}>
                                     <button onClick={()=>setGroupView('none')} style={{flex:1,padding:'8px',borderRadius:'12px',border:'1.5px solid var(--glass-border)',background:'var(--glass-bg2)',cursor:'pointer',fontSize:'11px',fontWeight:800,color:'var(--text-sub)',fontFamily:'Pretendard,sans-serif'}}>취소</button>
                                     <button onClick={joinGroup} disabled={!joinCode.trim()||groupLoading} className="btn-primary" style={{flex:1,padding:'8px',fontSize:'11px',opacity:!joinCode.trim()?0.4:1}}>{groupLoading?'..':'참여'}</button>
@@ -2840,7 +2875,7 @@
                             border:'1px solid var(--glass-border)',
                             borderRadius:'16px', padding:'10px', width:'240px',
                             boxShadow:'0 16px 40px rgba(0,0,0,0.25)'}}>
-                            <input value={query} onChange={e=>setQuery(e.target.value)}
+                            <KorInput value={query} onChange={e=>setQuery(e.target.value)}
                                 placeholder="과목 검색..."
                                 style={{width:'100%', background:'var(--glass-bg2)', border:'1px solid var(--glass-border)',
                                     borderRadius:'8px', color:'var(--text)', fontSize:'12px',
@@ -2971,7 +3006,7 @@
                         {/* 제목 */}
                         <div style={{marginBottom:'16px'}}>
                             <p style={{fontSize:'9px', fontWeight:900, opacity:0.35, textTransform:'uppercase', letterSpacing:'0.2em', marginBottom:'8px', color:'var(--text)'}}>Title</p>
-                            <input value={wTitle} onChange={e=>setWTitle(e.target.value)}
+                            <KorInput value={wTitle} onChange={e=>setWTitle(e.target.value)}
                                 placeholder="게시물 제목"
                                 style={{width:'100%', fontSize:'16px', fontWeight:800}} />
                         </div>
@@ -2979,7 +3014,7 @@
                         {/* 설명 */}
                         <div style={{marginBottom:'20px'}}>
                             <p style={{fontSize:'9px', fontWeight:900, opacity:0.35, textTransform:'uppercase', letterSpacing:'0.2em', marginBottom:'8px', color:'var(--text)'}}>Description</p>
-                            <textarea value={wDesc} onChange={e=>setWDesc(e.target.value)}
+                            <KorTextarea value={wDesc} onChange={e=>setWDesc(e.target.value)}
                                 placeholder="자료에 대한 설명을 입력하세요... (선택)"
                                 rows={5}
                                 style={{width:'100%', resize:'vertical', fontSize:'14px', fontWeight:600, lineHeight:1.7,
@@ -2999,7 +3034,7 @@
                                 background:'var(--glass-bg2)', cursor:'pointer', transition:'all 0.15s'}}
                                 onMouseEnter={e=>{e.currentTarget.style.borderColor='var(--accent)'; e.currentTarget.style.background='rgba(79,110,247,0.06)';}}
                                 onMouseLeave={e=>{e.currentTarget.style.borderColor='var(--glass-border)'; e.currentTarget.style.background='var(--glass-bg2)';}}>
-                                <input type="file" multiple ref={fileRef}
+                                <KorInput type="file" multiple ref={fileRef}
                                     style={{display:'none'}}
                                     onChange={e=>setWFiles(Array.from(e.target.files||[]))} />
                                 <span style={{fontSize:'28px'}}>📁</span>
@@ -3204,14 +3239,14 @@
                             <div style={{display:'flex', flexDirection:'column', gap:'12px'}}>
                                 <div>
                                     <label style={{fontSize:'9px', fontWeight:900, opacity:0.4, textTransform:'uppercase', letterSpacing:'0.18em', display:'block', marginBottom:'8px', color:'var(--text)'}}>참여자 ID *</label>
-                                    <input autoFocus value={createIds} onChange={e=>setCreateIds(e.target.value)}
+                                    <KorInput autoFocus value={createIds} onChange={e=>setCreateIds(e.target.value)}
                                         onKeyDown={e=>e.key==='Enter'&&createRoom()}
                                         placeholder="예: user1 또는 user1, user2"
                                         style={{width:'100%', fontSize:'14px', fontWeight:700}} />
                                 </div>
                                 <div>
                                     <label style={{fontSize:'9px', fontWeight:900, opacity:0.4, textTransform:'uppercase', letterSpacing:'0.18em', display:'block', marginBottom:'8px', color:'var(--text)'}}>대화방 이름 (선택)</label>
-                                    <input value={createName} onChange={e=>setCreateName(e.target.value)}
+                                    <KorInput value={createName} onChange={e=>setCreateName(e.target.value)}
                                         onKeyDown={e=>e.key==='Enter'&&createRoom()}
                                         placeholder="그룹 이름 (비우면 자동)"
                                         style={{width:'100%', fontSize:'14px', fontWeight:700}} />
@@ -3278,7 +3313,7 @@
 
                         {/* 입력바 */}
                         <div style={{padding:'10px 12px', borderTop:'1px solid var(--glass-border)', display:'flex', gap:'8px', alignItems:'flex-end', background:'var(--glass-bg2)', flexShrink:0}}>
-                            <textarea ref={inputRef}
+                            <KorTextarea ref={inputRef}
                                 value={msgInput} onChange={e=>setMsgInput(e.target.value)}
                                 onKeyDown={e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); sendMsg(); } }}
                                 placeholder="메시지 입력…"
@@ -3305,7 +3340,7 @@
 
                         {/* 검색창 */}
                         <div style={{padding:'0 16px 14px'}}>
-                            <input value={roomSearch} onChange={e=>setRoomSearch(e.target.value)}
+                            <KorInput value={roomSearch} onChange={e=>setRoomSearch(e.target.value)}
                                 placeholder="검색"
                                 style={{width:'100%', fontSize:'14px', fontWeight:600, padding:'10px 16px', borderRadius:'14px', background:'var(--glass-bg2)', border:'1px solid var(--glass-border)'}} />
                         </div>
@@ -3354,7 +3389,7 @@
                                     onMouseEnter={e=>{e.currentTarget.style.background='rgba(79,110,247,0.12)';}}
                                     onMouseLeave={e=>{e.currentTarget.style.background='var(--glass-bg)';}}>✏️</button>
                             </div>
-                            <input value={roomSearch} onChange={e=>setRoomSearch(e.target.value)}
+                            <KorInput value={roomSearch} onChange={e=>setRoomSearch(e.target.value)}
                                 placeholder="🔍  대화 검색"
                                 style={{width:'100%', fontSize:'12px', fontWeight:700, padding:'9px 14px', borderRadius:'12px'}} />
                         </div>
@@ -3397,14 +3432,14 @@
                                     <div style={{display:'flex', flexDirection:'column', gap:'12px'}}>
                                         <div>
                                             <label style={{fontSize:'9px', fontWeight:900, opacity:0.4, textTransform:'uppercase', letterSpacing:'0.18em', display:'block', marginBottom:'8px', color:'var(--text)'}}>참여자 ID *</label>
-                                            <input autoFocus value={createIds} onChange={e=>setCreateIds(e.target.value)}
+                                            <KorInput autoFocus value={createIds} onChange={e=>setCreateIds(e.target.value)}
                                                 onKeyDown={e=>e.key==='Enter'&&createRoom()}
                                                 placeholder="예: user1 또는 user1, user2, user3"
                                                 style={{width:'100%', fontSize:'14px', fontWeight:700}} />
                                         </div>
                                         <div>
                                             <label style={{fontSize:'9px', fontWeight:900, opacity:0.4, textTransform:'uppercase', letterSpacing:'0.18em', display:'block', marginBottom:'8px', color:'var(--text)'}}>대화방 이름 (선택)</label>
-                                            <input value={createName} onChange={e=>setCreateName(e.target.value)}
+                                            <KorInput value={createName} onChange={e=>setCreateName(e.target.value)}
                                                 onKeyDown={e=>e.key==='Enter'&&createRoom()}
                                                 placeholder="그룹 이름 (비우면 자동 설정)"
                                                 style={{width:'100%', fontSize:'14px', fontWeight:700}} />
@@ -3474,7 +3509,7 @@
 
                                 {/* 메시지 입력바 */}
                                 <div style={{padding:'14px 24px', borderTop:'1px solid var(--glass-border)', display:'flex', gap:'10px', alignItems:'flex-end', background:'var(--glass-bg2)', flexShrink:0}}>
-                                    <textarea ref={inputRef}
+                                    <KorTextarea ref={inputRef}
                                         value={msgInput} onChange={e=>setMsgInput(e.target.value)}
                                         onKeyDown={e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); sendMsg(); } }}
                                         placeholder="메시지 입력… (Enter 전송, Shift+Enter 줄바꿈)"
@@ -3566,7 +3601,7 @@
                         {/* 닉네임 */}
                         <SettingsSection label="Nickname">
                             <div style={{display:'flex', gap:'10px'}}>
-                                <input value={nickname} onChange={e=>setNickname(e.target.value)} placeholder="표시 이름" style={{flex:1}} />
+                                <KorInput value={nickname} onChange={e=>setNickname(e.target.value)} placeholder="표시 이름" style={{flex:1}} />
                                 <button className="btn-primary" onClick={saveName} style={{flexShrink:0, padding:'12px 20px'}}>
                                     {nameSaved ? '✓ 저장됨' : '저장'}
                                 </button>
@@ -3576,7 +3611,7 @@
                         {/* 학교명 */}
                         <SettingsSection label="School Name">
                             <div style={{display:'flex', gap:'10px'}}>
-                                <input value={school} onChange={e=>setSchool(e.target.value)} placeholder="학교 이름" style={{flex:1}} />
+                                <KorInput value={school} onChange={e=>setSchool(e.target.value)} placeholder="학교 이름" style={{flex:1}} />
                                 <button className="btn-primary" onClick={saveSchool} style={{flexShrink:0, padding:'12px 20px'}}>
                                     {saved ? '✓ 저장됨' : '저장'}
                                 </button>
@@ -3625,7 +3660,7 @@
 
                         {/* 수능 D-Day */}
                         <SettingsSection label="수능 D-Day">
-                            <input type="date" value={suneungDate} onChange={e=>onSuneungChange(e.target.value)} />
+                            <KorInput type="date" value={suneungDate} onChange={e=>onSuneungChange(e.target.value)} />
                             <p style={{fontSize:'12px', fontWeight:800, color:'var(--accent)', marginTop:'10px', opacity:0.8}}>현재: {getDDay(suneungDate)}</p>
                         </SettingsSection>
                     </div>
@@ -3741,7 +3776,7 @@
                         {/* 관리자 숨김 패널 (로고 7번 클릭) */}
                         {showAdmin && (
                             <div style={{marginTop:'20px', paddingTop:'20px', borderTop:'1px solid rgba(255,255,255,0.08)'}}>
-                                <input type="password" value={adminPw} onChange={e=>setAdminPw(e.target.value)}
+                                <KorInput type="password" value={adminPw} onChange={e=>setAdminPw(e.target.value)}
                                     onKeyDown={e=>{ if(e.key==='Enter' && adminPw==='admin1234!') onAdminLogin(); }}
                                     placeholder="관리자 코드"
                                     style={{width:'100%', background:'rgba(255,255,255,0.06)', border:'1.5px solid rgba(255,255,255,0.1)', color:'#fff', borderRadius:'12px', padding:'11px 16px', fontSize:'13px', fontWeight:700, fontFamily:'Pretendard,sans-serif', outline:'none', textAlign:'center'}} />
@@ -3792,7 +3827,7 @@
                             {/* ID 입력 */}
                             <div>
                                 <p style={{fontSize:'10px', fontWeight:800, color:'rgba(96,165,250,0.7)', textTransform:'uppercase', letterSpacing:'0.2em', marginBottom:'7px'}}>ID (영문·숫자·_ / 변경불가)</p>
-                                <input value={id} onChange={e=>{ setId(e.target.value); setIdError(''); }}
+                                <KorInput value={id} onChange={e=>{ setId(e.target.value); setIdError(''); }}
                                     onKeyDown={e=>{ if(e.key==='Enter') submit(); }}
                                     placeholder="예: hong_gildong"
                                     style={{width:'100%', background:'rgba(255,255,255,0.06)', border:`1.5px solid ${idError ? '#ef4444' : 'rgba(255,255,255,0.1)'}`, color:'#fff', borderRadius:'16px', padding:'13px 18px', fontSize:'14px', fontWeight:700, fontFamily:'Pretendard,sans-serif', outline:'none'}}
@@ -3804,7 +3839,7 @@
                             {/* 닉네임 입력 */}
                             <div>
                                 <p style={{fontSize:'10px', fontWeight:800, color:'rgba(96,165,250,0.7)', textTransform:'uppercase', letterSpacing:'0.2em', marginBottom:'7px'}}>닉네임 (언제든 변경 가능)</p>
-                                <input value={name} onChange={e=>setName(e.target.value)}
+                                <KorInput value={name} onChange={e=>setName(e.target.value)}
                                     onKeyDown={e=>{ if(e.key==='Enter') submit(); }}
                                     placeholder="표시될 이름"
                                     style={{width:'100%', background:'rgba(255,255,255,0.06)', border:'1.5px solid rgba(255,255,255,0.1)', color:'#fff', borderRadius:'16px', padding:'13px 18px', fontSize:'14px', fontWeight:700, fontFamily:'Pretendard,sans-serif', outline:'none'}}
