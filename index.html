@@ -1671,85 +1671,91 @@
 
         function Dashboard({ announcements, todos, resources, posts, studyTime, suneungDate, getDDay, setView }) {
             const todayCount = todos.filter(t => t.date === new Date().toISOString().split('T')[0]).length;
+            const [winW, setWinW] = useState(window.innerWidth);
+            useEffect(() => {
+                const h = () => setWinW(window.innerWidth);
+                window.addEventListener('resize', h);
+                return () => window.removeEventListener('resize', h);
+            }, []);
+            const mob = winW < 1100;
+
             const stats = [
-                {l:'Active Tasks', v: todayCount,              u:'Goals', icon:'✅'},
-                {l:'Study Time',   v: Math.floor(studyTime/60),u:'Mins',  icon:'⏱️'},
-                {l:'D-Day',        v: getDDay(suneungDate),    u:'',      icon:'🎯'},
-                {l:'Resources',    v: resources.length,        u:'Files', icon:'📚'},
+                {l:'Tasks', v: todayCount,              u:'개', icon:'✅'},
+                {l:'Study',  v: Math.floor(studyTime/60),u:'분', icon:'⏱️'},
+                {l:'D-Day',  v: getDDay(suneungDate),    u:'',   icon:'🎯'},
+                {l:'자료',   v: resources.length,        u:'개', icon:'📚'},
             ];
             return (
-                <div style={{display:'flex', flexDirection:'column', gap:'20px'}}>
+                <div style={{display:'flex', flexDirection:'column', gap: mob ? '12px' : '20px'}}>
                     {/* 히어로 배너 */}
-                    <div className="hero-banner anim-fade-up">
-                        <div className="hero-blob" style={{width:'280px',height:'280px',top:'-80px',right:'-60px',animationDelay:'0s'}}></div>
-                        <div className="hero-blob" style={{width:'180px',height:'180px',bottom:'-60px',left:'10%',animationDelay:'3s'}}></div>
+                    <div className="hero-banner anim-fade-up" style={mob ? {padding:'16px 18px', borderRadius:'20px'} : {}}>
+                        {!mob && <>
+                            <div className="hero-blob" style={{width:'280px',height:'280px',top:'-80px',right:'-60px',animationDelay:'0s'}}></div>
+                            <div className="hero-blob" style={{width:'180px',height:'180px',bottom:'-60px',left:'10%',animationDelay:'3s'}}></div>
+                        </>}
                         <div style={{position:'relative', zIndex:1}}>
-                            <p style={{fontSize:'11px', fontWeight:800, textTransform:'uppercase', letterSpacing:'0.2em', opacity:0.7, marginBottom:'8px'}}>Welcome Back</p>
-                            <h3 style={{fontSize:'26px', fontWeight:900, letterSpacing:'-0.5px', marginBottom:'6px', lineHeight:1.2}}>
-                                오늘도 한 걸음, 수능까지 {getDDay(suneungDate)} 🌟
+                            <p style={{fontSize: mob?'9px':'11px', fontWeight:800, textTransform:'uppercase', letterSpacing:'0.2em', opacity:0.7, marginBottom: mob?'4px':'8px'}}>Welcome Back</p>
+                            <h3 style={{fontSize: mob?'17px':'26px', fontWeight:900, letterSpacing:'-0.5px', marginBottom: mob?'4px':'6px', lineHeight:1.25}}>
+                                수능까지 {getDDay(suneungDate)} 🌟
                             </h3>
-                            <p style={{fontSize:'13px', opacity:0.65, fontWeight:600, marginBottom:'28px'}}>하이스트와 함께 오늘의 목표를 달성하세요.</p>
-                            <div style={{display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:'12px'}}>
+                            <p style={{fontSize: mob?'11px':'13px', opacity:0.6, fontWeight:600, marginBottom: mob?'14px':'28px'}}>오늘도 하이스트와 함께!</p>
+                            <div style={{display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap: mob?'8px':'12px'}}>
                                 {stats.map((s,i) => (
-                                    <div key={i} className="stat-card" style={{animationDelay:`${i*0.08}s`}}>
-                                        <div style={{fontSize:'18px', marginBottom:'6px'}}>{s.icon}</div>
-                                        <div style={{fontSize:'9px', fontWeight:800, textTransform:'uppercase', letterSpacing:'0.15em', opacity:0.55, marginBottom:'4px'}}>{s.l}</div>
-                                        <div style={{fontSize:'24px', fontWeight:900, letterSpacing:'-0.5px'}}>{s.v}<span style={{fontSize:'10px', opacity:0.45, fontWeight:700, marginLeft:'3px'}}>{s.u}</span></div>
+                                    <div key={i} className="stat-card" style={{animationDelay:`${i*0.08}s`, padding: mob?'10px 8px':'16px 12px'}}>
+                                        <div style={{fontSize: mob?'14px':'18px', marginBottom: mob?'3px':'6px'}}>{s.icon}</div>
+                                        <div style={{fontSize:'8px', fontWeight:800, textTransform:'uppercase', letterSpacing:'0.12em', opacity:0.5, marginBottom:'3px'}}>{s.l}</div>
+                                        <div style={{fontSize: mob?'16px':'24px', fontWeight:900, letterSpacing:'-0.5px'}}>{s.v}<span style={{fontSize:'9px', opacity:0.45, fontWeight:700, marginLeft:'2px'}}>{s.u}</span></div>
                                     </div>
                                 ))}
                             </div>
                         </div>
                     </div>
 
-                    {/* 하단 카드 2열 */}
-                    <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'16px'}}>
+                    {/* 하단 카드 — 모바일 1열 / 데스크탑 2열 */}
+                    <div style={{display:'grid', gridTemplateColumns: mob?'1fr':'1fr 1fr', gap: mob?'10px':'16px'}}>
                         {/* 공지 */}
-                        <div className="glass-card anim-fade-up delay-1" style={{padding:'24px'}}>
-                            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'16px'}}>
-                                <h3 style={{fontSize:'14px', fontWeight:800, color:'var(--text)'}}>📢 공지사항</h3>
+                        <div className="glass-card anim-fade-up delay-1" style={{padding: mob?'14px':'24px'}}>
+                            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: mob?'10px':'16px'}}>
+                                <h3 style={{fontSize: mob?'13px':'14px', fontWeight:800, color:'var(--text)'}}>📢 공지사항</h3>
                                 <span style={{fontSize:'9px', fontWeight:800, opacity:0.3, textTransform:'uppercase', letterSpacing:'0.1em'}}>Latest 3</span>
                             </div>
-                            <div style={{display:'flex', flexDirection:'column', gap:'8px'}}>
+                            <div style={{display:'flex', flexDirection:'column', gap:'6px'}}>
                                 {announcements.slice(0,3).map((a,i) => (
-                                    <div key={a.id} className="glass-inset" style={{padding:'12px 16px', animation:`fadeInUp 0.3s ease ${i*0.06}s both`}}>
-                                        <div style={{fontSize:'13px', fontWeight:800, color:'var(--text)', marginBottom:'3px'}}>{a.title}</div>
-                                        <div style={{fontSize:'9px', fontWeight:700, opacity:0.35, textTransform:'uppercase', letterSpacing:'0.1em'}}>{a.date}</div>
+                                    <div key={a.id} className="glass-inset" style={{padding: mob?'8px 12px':'12px 16px', animation:`fadeInUp 0.3s ease ${i*0.06}s both`}}>
+                                        <div style={{fontSize: mob?'12px':'13px', fontWeight:800, color:'var(--text)', marginBottom:'2px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{a.title}</div>
+                                        <div style={{fontSize:'9px', fontWeight:700, opacity:0.35}}>{a.date}</div>
                                     </div>
                                 ))}
                                 {announcements.length === 0 && (
-                                    <div style={{textAlign:'center', padding:'24px', fontSize:'11px', fontWeight:700, opacity:0.2, textTransform:'uppercase', letterSpacing:'0.1em'}}>등록된 공지가 없습니다</div>
+                                    <div style={{textAlign:'center', padding:'20px', fontSize:'11px', fontWeight:700, opacity:0.2, textTransform:'uppercase', letterSpacing:'0.1em'}}>등록된 공지가 없습니다</div>
                                 )}
                             </div>
                         </div>
 
-                        {/* 커뮤니티 트렌드 */}
-                        <div className="glass-card anim-fade-up delay-2" style={{padding:'24px'}}>
-                            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'16px'}}>
-                                <h3 style={{fontSize:'14px', fontWeight:800, color:'var(--text)'}}>🔥 Community</h3>
-                                <button onClick={()=>setView('커뮤니티')} style={{fontSize:'9px', fontWeight:800, opacity:0.45, textTransform:'uppercase', letterSpacing:'0.1em', background:'none', border:'none', cursor:'pointer', color:'var(--accent)', fontFamily:'Pretendard,sans-serif', transition:'opacity 0.2s'}} onMouseEnter={e=>e.currentTarget.style.opacity='1'} onMouseLeave={e=>e.currentTarget.style.opacity='0.45'}>더보기 →</button>
+                        {/* 커뮤니티 */}
+                        <div className="glass-card anim-fade-up delay-2" style={{padding: mob?'14px':'24px'}}>
+                            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: mob?'10px':'16px'}}>
+                                <h3 style={{fontSize: mob?'13px':'14px', fontWeight:800, color:'var(--text)'}}>🔥 Community</h3>
+                                <button onClick={()=>setView('커뮤니티')} style={{fontSize:'9px', fontWeight:800, opacity:0.45, textTransform:'uppercase', letterSpacing:'0.1em', background:'none', border:'none', cursor:'pointer', color:'var(--accent)', fontFamily:'Pretendard,sans-serif'}}>더보기 →</button>
                             </div>
-                            <div style={{display:'flex', flexDirection:'column', gap:'8px'}}>
+                            <div style={{display:'flex', flexDirection:'column', gap:'6px'}}>
                                 {posts.length > 0 ? posts.slice(0,3).map((p,i) => (
-                                    <div key={p.id} className="glass-inset" style={{padding:'12px 16px', display:'flex', alignItems:'center', gap:'12px', cursor:'pointer', transition:'all 0.2s', animation:`fadeInUp 0.3s ease ${i*0.06}s both`}}
-                                        onClick={()=>setView('커뮤니티')}
-                                        onMouseEnter={e=>{e.currentTarget.style.transform='translateX(4px)'}}
-                                        onMouseLeave={e=>{e.currentTarget.style.transform=''}}>
-                                        <div style={{width:'32px', height:'32px', borderRadius:'10px', background:'var(--glass-bg)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'13px', flexShrink:0, fontWeight:800, color:'var(--accent)'}}>
+                                    <div key={p.id} className="glass-inset" style={{padding: mob?'8px 12px':'12px 16px', display:'flex', alignItems:'center', gap:'10px', cursor:'pointer', transition:'all 0.2s', animation:`fadeInUp 0.3s ease ${i*0.06}s both`}}
+                                        onClick={()=>setView('커뮤니티')}>
+                                        <div style={{width:'28px', height:'28px', borderRadius:'9px', background:'var(--glass-bg)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'12px', flexShrink:0, color:'var(--accent)'}}>
                                             {p.category==='공부'?'📖':p.category==='질문'?'❓':p.category==='잡담'?'💬':'📝'}
                                         </div>
                                         <div style={{flex:1, minWidth:0}}>
                                             <div style={{fontSize:'12px', fontWeight:800, color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{p.title}</div>
-                                            <div style={{fontSize:'10px', fontWeight:700, opacity:0.4, marginTop:'2px'}}>{p.authorName}</div>
+                                            <div style={{fontSize:'9px', fontWeight:700, opacity:0.4, marginTop:'1px'}}>{p.authorName}</div>
                                         </div>
                                     </div>
                                 )) : (
-                                    [{icon:'👑', text:'커뮤니티에 첫 글을 남겨보세요!'},{icon:'⚡', text:'공부 팁, 질문, 자유롭게 공유하세요'},{icon:'📖', text:'함께라면 더 멀리 갈 수 있어요'}].map((item,i) => (
-                                        <div key={i} className="glass-inset" style={{padding:'12px 16px', display:'flex', alignItems:'center', gap:'12px', cursor:'pointer', transition:'all 0.2s', animation:`fadeInUp 0.3s ease ${i*0.06}s both`}}
-                                            onClick={()=>setView('커뮤니티')}
-                                            onMouseEnter={e=>{e.currentTarget.style.transform='translateX(4px)'}}
-                                            onMouseLeave={e=>{e.currentTarget.style.transform=''}}>
-                                            <div style={{width:'32px', height:'32px', borderRadius:'10px', background:'var(--glass-bg)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'14px', flexShrink:0}}>{item.icon}</div>
-                                            <div style={{fontSize:'12px', fontWeight:700, opacity:0.75}}>{item.text}</div>
+                                    [{icon:'👑', text:'커뮤니티에 첫 글을 남겨보세요!'},{icon:'⚡', text:'공부 팁, 질문을 자유롭게 공유'},{icon:'📖', text:'함께라면 더 멀리 갈 수 있어요'}].map((item,i) => (
+                                        <div key={i} className="glass-inset" style={{padding: mob?'8px 12px':'12px 16px', display:'flex', alignItems:'center', gap:'10px', cursor:'pointer', animation:`fadeInUp 0.3s ease ${i*0.06}s both`}}
+                                            onClick={()=>setView('커뮤니티')}>
+                                            <div style={{width:'28px', height:'28px', borderRadius:'9px', background:'var(--glass-bg)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'13px', flexShrink:0}}>{item.icon}</div>
+                                            <div style={{fontSize:'11px', fontWeight:700, opacity:0.75}}>{item.text}</div>
                                         </div>
                                     ))
                                 )}
