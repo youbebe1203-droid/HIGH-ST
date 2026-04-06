@@ -1,0 +1,2932 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HIGH.ST | 차세대 학습 관리 경험</title>
+
+    <!-- React & Babel -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Pretendard Font -->
+    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" />
+
+    <!-- Firebase SDK (compat) -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
+
+    <!-- Firebase 초기화 -->
+    <!-- ⚠️ TODO: 아래 값을 Firebase 콘솔 > 프로젝트 설정 > 웹 앱에서 복사해 붙여넣으세요 -->
+    <script>
+        const firebaseConfig = {
+            apiKey:            "AIzaSyDfn8DuwRr7qlhe58vAAPEjnICquSTotNQ",
+            authDomain:        "hish-st.firebaseapp.com",
+            projectId:         "hish-st",
+            storageBucket:     "hish-st.firebasestorage.app",
+            messagingSenderId: "427036514229",
+            appId:             "1:427036514229:web:279801b15d46eb4bdcebfc"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const auth    = firebase.auth();
+        const db      = firebase.firestore();
+        const storage = firebase.storage();
+    </script>
+
+    <style>
+        /* ── 테마 변수 ─────────────────────────────────────── */
+        :root {
+            --bg:          #eef2ff;
+            --bg2:         #f5f0ff;
+            --text:        #0f172a;
+            --text-sub:    #64748b;
+            --accent:      #4f6ef7;
+            --accent2:     #818cf8;
+            --glass-bg:    rgba(255,255,255,0.55);
+            --glass-bg2:   rgba(255,255,255,0.35);
+            --glass-border:rgba(255,255,255,0.75);
+            --glass-shadow:0 8px 32px rgba(80,100,220,0.10), 0 1.5px 0 rgba(255,255,255,0.7) inset;
+            --card-shadow: 0 4px 24px rgba(80,100,200,0.08);
+            --sidebar-w:   300px;
+        }
+        .theme-dark {
+            --bg:           #080e1e;
+            --bg2:          #0d1630;
+            --text:         #e2e8f0;
+            --text-sub:     #64748b;
+            --accent:       #60a5fa;
+            --accent2:      #818cf8;
+            --glass-bg:     rgba(15,25,60,0.55);
+            --glass-bg2:    rgba(10,18,45,0.45);
+            --glass-border: rgba(255,255,255,0.07);
+            --glass-shadow: 0 8px 32px rgba(0,0,0,0.45), 0 1px 0 rgba(255,255,255,0.05) inset;
+            --card-shadow:  0 4px 24px rgba(0,0,0,0.35);
+        }
+        .theme-midnight {
+            --bg:           #000000;
+            --bg2:          #080808;
+            --text:         #ffffff;
+            --text-sub:     #555555;
+            --accent:       #a78bfa;
+            --accent2:      #7c3aed;
+            --glass-bg:     rgba(255,255,255,0.04);
+            --glass-bg2:    rgba(255,255,255,0.02);
+            --glass-border: rgba(255,255,255,0.06);
+            --glass-shadow: 0 8px 40px rgba(0,0,0,0.7), 0 1px 0 rgba(255,255,255,0.03) inset;
+            --card-shadow:  0 4px 32px rgba(0,0,0,0.6);
+        }
+
+        /* ── 기본 ──────────────────────────────────────────── */
+        *, *::before, *::after { box-sizing: border-box; }
+        body {
+            font-family: 'Pretendard', -apple-system, sans-serif;
+            background: linear-gradient(135deg, var(--bg) 0%, var(--bg2) 100%);
+            min-height: 100vh;
+            color: var(--text);
+            transition: background 0.5s ease, color 0.3s ease;
+            overflow: hidden;
+        }
+
+        /* ── 키프레임 ──────────────────────────────────────── */
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; } to { opacity: 1; }
+        }
+        @keyframes floatY {
+            0%,100% { transform: translateY(0px); }
+            50%      { transform: translateY(-10px); }
+        }
+        @keyframes breathe {
+            0%,100% { transform: scale(1)   rotate(0deg);   opacity: 0.5; }
+            33%      { transform: scale(1.08) rotate(3deg);  opacity: 0.7; }
+            66%      { transform: scale(0.95) rotate(-2deg); opacity: 0.4; }
+        }
+        @keyframes shimmer {
+            0%   { background-position: -200% center; }
+            100% { background-position:  200% center; }
+        }
+        @keyframes pulseGlow {
+            0%,100% { box-shadow: 0 0 0   0   rgba(239,68,68,0.3); }
+            50%      { box-shadow: 0 0 24px 8px rgba(239,68,68,0.5); }
+        }
+        @keyframes pulseGlowBlue {
+            0%,100% { box-shadow: 0 0 0   0   rgba(96,165,250,0.2); }
+            50%      { box-shadow: 0 0 20px 6px rgba(96,165,250,0.45); }
+        }
+        @keyframes gradientSlide {
+            0%   { background-position: 0%   50%; }
+            50%  { background-position: 100% 50%; }
+            100% { background-position: 0%   50%; }
+        }
+        @keyframes slideInLeft {
+            from { opacity: 0; transform: translateX(-16px); }
+            to   { opacity: 1; transform: translateX(0); }
+        }
+        @keyframes slideInRight {
+            from { opacity: 0; transform: translateX(16px); }
+            to   { opacity: 1; transform: translateX(0); }
+        }
+        @keyframes scaleIn {
+            from { opacity: 0; transform: scale(0.93); }
+            to   { opacity: 1; transform: scale(1); }
+        }
+        @keyframes timerPulse {
+            0%,100% { opacity: 1; }
+            50%      { opacity: 0.6; }
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ── 로그인 배경 오로라 애니메이션 ──────────────────── */
+        @keyframes drift1 {
+            0%   { transform: translate(0vw,    0vh)  scale(1)    rotate(0deg); }
+            18%  { transform: translate(12vw,   6vh)  scale(1.1)  rotate(8deg); }
+            40%  { transform: translate(20vw,  -4vh)  scale(0.97) rotate(-5deg); }
+            62%  { transform: translate(8vw,   14vh)  scale(1.06) rotate(6deg); }
+            80%  { transform: translate(-6vw,   8vh)  scale(1.03) rotate(-3deg); }
+            100% { transform: translate(0vw,    0vh)  scale(1)    rotate(0deg); }
+        }
+        @keyframes drift2 {
+            0%   { transform: translate(0vw,    0vh)  scale(1)    rotate(0deg); }
+            22%  { transform: translate(-14vw, -8vh)  scale(1.12) rotate(-10deg); }
+            48%  { transform: translate(-22vw,  6vh)  scale(0.94) rotate(6deg); }
+            70%  { transform: translate(-8vw,  -14vh) scale(1.06) rotate(-4deg); }
+            88%  { transform: translate(6vw,   -6vh)  scale(1.02) rotate(3deg); }
+            100% { transform: translate(0vw,    0vh)  scale(1)    rotate(0deg); }
+        }
+        @keyframes drift3 {
+            0%   { transform: translate(0vw,    0vh)  scale(1)    rotate(0deg); }
+            30%  { transform: translate(16vw,  -12vh) scale(1.15) rotate(12deg); }
+            58%  { transform: translate(10vw,  -22vh) scale(0.91) rotate(-7deg); }
+            80%  { transform: translate(-4vw,  -10vh) scale(1.05) rotate(5deg); }
+            100% { transform: translate(0vw,    0vh)  scale(1)    rotate(0deg); }
+        }
+        @keyframes drift4 {
+            0%   { transform: translate(0vw,   0vh)   scale(1)    rotate(0deg); }
+            25%  { transform: translate(-10vw, 10vh)  scale(1.09) rotate(-9deg); }
+            55%  { transform: translate(-18vw,  4vh)  scale(0.95) rotate(5deg); }
+            78%  { transform: translate(-6vw,  14vh)  scale(1.04) rotate(-3deg); }
+            100% { transform: translate(0vw,   0vh)   scale(1)    rotate(0deg); }
+        }
+        @keyframes drift5 {
+            0%   { transform: translate(0vw,   0vh)   scale(1); }
+            38%  { transform: translate(10vw, -8vh)   scale(1.18); }
+            70%  { transform: translate(-8vw,  8vh)   scale(0.9); }
+            100% { transform: translate(0vw,   0vh)   scale(1); }
+        }
+
+        /* ── 버튼 분리 / 합치기 애니메이션 ─────────────────────── */
+        @keyframes splitBtnLeft {
+            0%   { opacity: 0; filter: blur(8px); transform: translateX(22%); }
+            45%  { filter: blur(0); opacity: 1; }
+            72%  { transform: translateX(-3px); }
+            100% { opacity: 1; filter: blur(0); transform: translateX(0); }
+        }
+        @keyframes splitBtnRight {
+            0%   { opacity: 0; filter: blur(8px); transform: translateX(-22%); }
+            45%  { filter: blur(0); opacity: 1; }
+            72%  { transform: translateX(3px); }
+            100% { opacity: 1; filter: blur(0); transform: translateX(0); }
+        }
+        @keyframes mergeBtnLeft {
+            0%   { opacity: 1; filter: blur(0); transform: translateX(0); }
+            55%  { filter: blur(0); }
+            100% { opacity: 0; filter: blur(8px); transform: translateX(22%); }
+        }
+        @keyframes mergeBtnRight {
+            0%   { opacity: 1; filter: blur(0); transform: translateX(0); }
+            55%  { filter: blur(0); }
+            100% { opacity: 0; filter: blur(8px); transform: translateX(-22%); }
+        }
+
+        /* ── 글래스 카드 ────────────────────────────────────── */
+        .glass-card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(28px) saturate(180%);
+            -webkit-backdrop-filter: blur(28px) saturate(180%);
+            border: 1px solid var(--glass-border);
+            box-shadow: var(--glass-shadow);
+            border-radius: 28px;
+            transition: transform 0.25s ease, box-shadow 0.25s ease;
+        }
+        .glass-card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--glass-shadow), 0 12px 40px rgba(0,0,0,0.1);
+        }
+        .glass-card-lg {
+            background: var(--glass-bg);
+            backdrop-filter: blur(32px) saturate(200%);
+            -webkit-backdrop-filter: blur(32px) saturate(200%);
+            border: 1px solid var(--glass-border);
+            box-shadow: var(--glass-shadow);
+            border-radius: 40px;
+        }
+        .glass-inset {
+            background: var(--glass-bg2);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+        }
+
+        /* ── 사이드바 ───────────────────────────────────────── */
+        .sidebar {
+            width: var(--sidebar-w);
+            min-width: var(--sidebar-w);
+            background: var(--glass-bg);
+            backdrop-filter: blur(40px) saturate(200%);
+            -webkit-backdrop-filter: blur(40px) saturate(200%);
+            border-right: 1px solid var(--glass-border);
+            box-shadow: 4px 0 32px rgba(0,0,0,0.06);
+            display: flex;
+            flex-direction: column;
+            padding: 28px 20px;
+            z-index: 30;
+            overflow: hidden;
+        }
+
+        /* ── 사이드바 아이템 ─────────────────────────────────── */
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            width: 100%;
+            padding: 13px 18px;
+            border-radius: 18px;
+            font-size: 13px;
+            font-weight: 800;
+            color: var(--text-sub);
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-align: left;
+            margin-bottom: 4px;
+            position: relative;
+            overflow: hidden;
+        }
+        .nav-item::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: inherit;
+            background: var(--glass-bg2);
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        .nav-item:hover::before { opacity: 1; }
+        .nav-item:hover { color: var(--accent); transform: translateX(3px); }
+        .nav-item.active {
+            background: var(--accent);
+            color: #fff;
+            box-shadow: 0 4px 20px rgba(79,110,247,0.35);
+            transform: none;
+        }
+        .nav-item.active::before { display: none; }
+        .nav-item .icon { font-size: 16px; flex-shrink: 0; }
+
+        /* ── 섹션 레이블 ─────────────────────────────────────── */
+        .nav-label {
+            font-size: 9px;
+            font-weight: 900;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            color: var(--text-sub);
+            opacity: 0.45;
+            padding: 0 18px;
+            margin: 18px 0 8px;
+        }
+
+        /* ── 뱃지 ───────────────────────────────────────────── */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 3px 10px;
+            border-radius: 999px;
+            font-size: 9px;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+        .badge-student  { background: rgba(34,197,94,0.12); color: #16a34a; }
+        .badge-teacher  { background: rgba(168,85,247,0.12); color: #9333ea; }
+        .badge-admin    { background: rgba(239,68,68,0.12);  color: #dc2626; }
+
+        /* ── 입력 필드 ──────────────────────────────────────── */
+        input:not([type=checkbox]):not([type=file]):not([type=date]),
+        select, textarea {
+            background: var(--glass-bg2);
+            border: 1.5px solid var(--glass-border);
+            color: var(--text);
+            border-radius: 16px;
+            padding: 14px 20px;
+            font-size: 14px;
+            font-weight: 700;
+            font-family: 'Pretendard', sans-serif;
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            width: 100%;
+            backdrop-filter: blur(12px);
+        }
+        input:focus, select:focus, textarea:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(79,110,247,0.15);
+        }
+        input[type=date] {
+            background: var(--glass-bg2);
+            border: 1.5px solid var(--glass-border);
+            color: var(--text);
+            border-radius: 16px;
+            padding: 10px 16px;
+            font-size: 13px;
+            font-weight: 700;
+            font-family: 'Pretendard', sans-serif;
+            outline: none;
+        }
+
+        /* ── 버튼 ───────────────────────────────────────────── */
+        .btn-primary {
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            border-radius: 16px;
+            padding: 12px 24px;
+            font-size: 12px;
+            font-weight: 900;
+            font-family: 'Pretendard', sans-serif;
+            cursor: pointer;
+            letter-spacing: 0.05em;
+            transition: all 0.2s;
+            box-shadow: 0 4px 16px rgba(79,110,247,0.3);
+        }
+        .btn-primary:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 6px 24px rgba(79,110,247,0.4); }
+        .btn-primary:active:not(:disabled) { transform: scale(0.97); }
+        .btn-primary:disabled { opacity: 0.5; cursor: default; }
+
+        .btn-danger {
+            background: rgba(239,68,68,0.1);
+            color: #ef4444;
+            border: 1px solid rgba(239,68,68,0.2);
+            border-radius: 14px;
+            padding: 10px 20px;
+            font-size: 11px;
+            font-weight: 900;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-danger:hover { background: #ef4444; color: #fff; border-color: #ef4444; }
+
+        /* ── 스크롤바 ───────────────────────────────────────── */
+        ::-webkit-scrollbar { width: 5px; height: 5px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(128,128,128,0.2); border-radius: 99px; }
+
+        /* ── 애니메이션 유틸 ─────────────────────────────────── */
+        .anim-fade-up   { animation: fadeInUp  0.4s ease both; }
+        .anim-scale-in  { animation: scaleIn   0.35s ease both; }
+        .anim-fade-in   { animation: fadeIn    0.3s ease both; }
+        .anim-float     { animation: floatY    4s ease-in-out infinite; }
+
+        /* ── 메인 헤더 ──────────────────────────────────────── */
+        .main-header {
+            position: sticky;
+            top: 0;
+            z-index: 20;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 20px 40px;
+            background: var(--glass-bg);
+            backdrop-filter: blur(24px) saturate(180%);
+            -webkit-backdrop-filter: blur(24px) saturate(180%);
+            border-bottom: 1px solid var(--glass-border);
+        }
+
+        /* ── 히어로 배너 ─────────────────────────────────────── */
+        .hero-banner {
+            background: linear-gradient(135deg, var(--accent), var(--accent2), #a855f7, var(--accent));
+            background-size: 300% 300%;
+            animation: gradientSlide 8s ease infinite;
+            border-radius: 32px;
+            padding: 40px;
+            color: #fff;
+            position: relative;
+            overflow: hidden;
+        }
+        .hero-blob {
+            position: absolute;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.12);
+            filter: blur(40px);
+            animation: breathe 7s ease-in-out infinite;
+        }
+
+        /* ── stat 카드 ──────────────────────────────────────── */
+        .stat-card {
+            background: rgba(0,0,0,0.15);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 24px;
+            padding: 20px 24px;
+            animation: scaleIn 0.4s ease both;
+        }
+
+        /* ── 타이머 섹션 ─────────────────────────────────────── */
+        .timer-box {
+            background: rgba(2,6,20,0.85);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 28px;
+            padding: 28px 24px;
+            position: relative;
+            overflow: hidden;
+        }
+        .timer-active {
+            animation: pulseGlow 2s ease-in-out infinite;
+        }
+        .timer-digits {
+            font-family: 'Pretendard', monospace;
+            font-size: 42px;
+            font-weight: 900;
+            letter-spacing: -1px;
+            color: #fff;
+            line-height: 1;
+        }
+
+        /* ── 투두 아이템 ─────────────────────────────────────── */
+        .todo-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 18px 22px;
+            border-radius: 20px;
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            backdrop-filter: blur(16px);
+            transition: all 0.2s ease;
+            animation: fadeInUp 0.3s ease both;
+        }
+        .todo-item:hover { transform: translateX(4px); border-color: var(--accent); }
+
+        /* ── 캘린더 셀 ──────────────────────────────────────── */
+        .cal-cell {
+            min-height: 100px;
+            padding: 12px;
+            border-radius: 20px;
+            border: 1px solid var(--glass-border);
+            background: var(--glass-bg2);
+            transition: all 0.2s;
+        }
+        .cal-cell:hover { background: var(--glass-bg); transform: scale(1.04); z-index: 2; box-shadow: 0 8px 24px rgba(0,0,0,0.1); }
+
+        /* ── 메시지 버블 ─────────────────────────────────────── */
+        .msg-bubble-out { animation: slideInRight 0.3s ease both; }
+        .msg-bubble-in  { animation: slideInLeft  0.3s ease both; }
+
+        /* ── 섹션 진입 딜레이 ────────────────────────────────── */
+        .delay-1 { animation-delay: 0.05s; }
+        .delay-2 { animation-delay: 0.10s; }
+        .delay-3 { animation-delay: 0.15s; }
+        .delay-4 { animation-delay: 0.20s; }
+    </style>
+</head>
+<body class="theme-light">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useMemo } = React;
+
+        // ─── 과목 상수 ───────────────────────────────────────────────────────
+        const SUBJECTS = [
+            { id: '수학', icon: '📐', color: '#3b82f6' },
+            { id: '국어', icon: '📝', color: '#ef4444' },
+            { id: '영어', icon: '🌐', color: '#10b981' },
+            { id: '탐구', icon: '🔬', color: '#f59e0b' },
+            { id: '기타', icon: '📚', color: '#8b5cf6' },
+        ];
+
+        // ─── App ─────────────────────────────────────────────────────────────
+
+        function App() {
+            const [view, setView]               = useState('대시보드');
+            const [currentUser, setCurrentUser] = useState(null);
+            const [loading, setLoading]         = useState(true);
+            const [userRole, setUserRole]       = useState('학생');
+            const [theme, setTheme]             = useState('light');
+
+            const [todos, setTodos]               = useState([]);
+            const [resources, setResources]       = useState([]);
+            const [announcements, setAnnouncements] = useState([]);
+            const [rooms, setRooms]               = useState([]);
+            const [localRoomMessages, setLocalRoomMessages] = useState({});
+            const [sharedEvents, setSharedEvents] = useState([]);
+            const [posts, setPosts]               = useState([]);
+
+            const [studyTime, setStudyTime]       = useState(0);
+            const [suneungDate, setSuneungDate]   = useState('2025-11-13');
+            const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+            const [studyGroups, setStudyGroups]   = useState([]);
+
+            const unsubRefs = useRef([]);
+
+            // 테마 적용 (로컬)
+            useEffect(() => {
+                document.body.className = `theme-${theme}`;
+            }, [theme]);
+
+            // Firebase Auth 상태 감지
+            useEffect(() => {
+                const unsub = auth.onAuthStateChanged(async (fbUser) => {
+                    if (fbUser) {
+                        const snap = await db.collection('users').doc(fbUser.uid).get();
+                        if (snap.exists) {
+                            const profile = snap.data();
+                            setCurrentUser({ uid: fbUser.uid, ...profile });
+                            setUserRole(profile.role || '학생');
+                            setTheme(profile.theme || 'light');
+                            await loadData(fbUser.uid, profile);
+                        }
+                    } else {
+                        // 로그아웃: 리스너 해제 및 상태 초기화
+                        unsubRefs.current.forEach(u => u());
+                        unsubRefs.current = [];
+                        setCurrentUser(null);
+                        setTodos([]); setResources([]); setAnnouncements([]);
+                        setRooms([]); setLocalRoomMessages({}); setSharedEvents([]); setPosts([]);
+                        setStudyGroups([]); setStudyTime(0);
+                    }
+                    setLoading(false);
+                });
+                return () => unsub();
+            }, []);
+
+            // Firestore 데이터 로드
+            const loadData = async (uid, profile) => {
+                // 개인 데이터 (1회 읽기)
+                const todosSnap = await db.collection('users').doc(uid)
+                    .collection('todos').orderBy('date').get();
+                setTodos(todosSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+
+                // studyTime: 날짜가 바뀌면 0 리셋
+                const today = new Date().toISOString().split('T')[0];
+                setStudyTime(profile.studyDate === today ? (profile.studyTime || 0) : 0);
+                setSuneungDate(profile.suneungDate || '2025-11-13');
+
+                // 공용 데이터 (실시간 리스너)
+                const unsubAnn = db.collection('announcements')
+                    .orderBy('date', 'desc')
+                    .onSnapshot(snap => setAnnouncements(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+
+                const unsubEvents = db.collection('events')
+                    .onSnapshot(snap => setSharedEvents(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+
+                const unsubRes = db.collection('resources')
+                    .orderBy('createdAt', 'desc')
+                    .onSnapshot(snap => setResources(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+
+                const unsubPosts = db.collection('posts')
+                    .orderBy('createdAt', 'desc')
+                    .onSnapshot(snap => setPosts(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+
+                const unsubRooms = db.collection('rooms')
+                    .where('members', 'array-contains', uid)
+                    .onSnapshot(snap => {
+                        const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                        list.sort((a, b) => {
+                            const t = r => r.lastTime?.toDate ? r.lastTime.toDate().getTime() : new Date(r.lastTime || 0).getTime();
+                            return t(b) - t(a);
+                        });
+                        setRooms(list);
+                    }, () => {});
+
+                const unsubGroups = db.collection('studyGroups')
+                    .where('members', 'array-contains', uid)
+                    .onSnapshot(snap => setStudyGroups(snap.docs.map(d => ({ id: d.id, ...d.data() }))), () => {});
+
+                unsubRefs.current = [unsubAnn, unsubEvents, unsubRes, unsubPosts, unsubRooms, unsubGroups];
+            };
+
+            // 프로필 저장 헬퍼
+            const saveProfile = async (fields) => {
+                if (!currentUser) return;
+                setCurrentUser(prev => ({ ...prev, ...fields }));
+                if (isLocalAdmin()) return;
+                await db.collection('users').doc(currentUser.uid).update(fields);
+            };
+
+            // D-Day 계산
+            const getDDay = (dateStr) => {
+                const today = new Date(); today.setHours(0,0,0,0);
+                const target = new Date(dateStr); target.setHours(0,0,0,0);
+                const diff = target.getTime() - today.getTime();
+                const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+                return days === 0 ? 'D-Day' : days > 0 ? `D-${days}` : `D+${Math.abs(days)}`;
+            };
+
+            // 로컬 어드민 여부 확인
+            const isLocalAdmin = () => currentUser?.uid === 'local-admin';
+
+            // 인증 핸들러
+            const handleAuth = async (id, pw, name, mode) => {
+                // ── 로컬 어드민 계정 (Firebase 없이도 접근 가능) ──
+                if (mode === 'login' && id === 'admin' && pw === 'admin1234!') {
+                    const today = new Date().toISOString().split('T')[0];
+                    setCurrentUser({ uid: 'local-admin', id: 'admin', name: '관리자', school: 'HIGH.ST', role: '관리자', theme: 'light', studyTime: 0, studyDate: today, suneungDate: '2025-11-13' });
+                    setUserRole('관리자');
+                    setLoading(false);
+                    return;
+                }
+                const email = `${id}@highst.app`;
+                try {
+                    if (mode === 'login') {
+                        await auth.signInWithEmailAndPassword(email, pw);
+                    } else {
+                        const idDoc = await db.collection('userIds').doc(id).get();
+                        if (idDoc.exists) { alert('이미 사용 중인 ID입니다.'); return; }
+                        const cred = await auth.createUserWithEmailAndPassword(email, pw);
+                        const uid  = cred.user.uid;
+                        const today = new Date().toISOString().split('T')[0];
+                        await db.collection('users').doc(uid).set({
+                            id, name, school: '미설정 학교',
+                            role: '학생', theme: 'light',
+                            studyTime: 0, studyDate: today,
+                            suneungDate: '2025-11-13'
+                        });
+                        await db.collection('userIds').doc(id).set({ uid });
+                        alert('가입 완료! 로그인해 주세요.');
+                    }
+                } catch (e) {
+                    const msg = e.code === 'auth/wrong-password' || e.code === 'auth/user-not-found'
+                        ? '아이디 또는 비밀번호가 틀립니다.'
+                        : e.code === 'auth/weak-password'
+                        ? '비밀번호는 6자 이상이어야 합니다.'
+                        : e.message;
+                    alert(msg);
+                }
+            };
+
+            const handleLogout = async () => {
+                if (isLocalAdmin()) { setCurrentUser(null); return; }
+                await auth.signOut();
+            };
+
+            // ── Todo 핸들러 ──────────────────────────────────────────────────
+            const handleAddTodo = async (text, date) => {
+                const newTodo = { text, completed: false, date };
+                if (isLocalAdmin()) { setTodos(prev => [...prev, { id: String(Date.now()), ...newTodo }]); return; }
+                const ref = await db.collection('users').doc(currentUser.uid)
+                    .collection('todos').add(newTodo);
+                setTodos(prev => [...prev, { id: ref.id, ...newTodo }]);
+            };
+
+            const handleToggleTodo = async (id) => {
+                const todo = todos.find(t => t.id === id);
+                if (!todo) return;
+                const updated = !todo.completed;
+                if (!isLocalAdmin()) {
+                    await db.collection('users').doc(currentUser.uid)
+                        .collection('todos').doc(id).update({ completed: updated });
+                }
+                setTodos(prev => prev.map(t => t.id === id ? { ...t, completed: updated } : t));
+            };
+
+            const handleDeleteTodo = async (id) => {
+                if (!isLocalAdmin()) {
+                    await db.collection('users').doc(currentUser.uid)
+                        .collection('todos').doc(id).delete();
+                }
+                setTodos(prev => prev.filter(t => t.id !== id));
+            };
+
+            // ── 공지사항 핸들러 ──────────────────────────────────────────────
+            const handleAddAnnouncement = async (title, content) => {
+                const newAnn = { id: String(Date.now()), title, content, date: new Date().toLocaleDateString(), authorUid: currentUser.uid };
+                if (isLocalAdmin()) { setAnnouncements(prev => [newAnn, ...prev]); return; }
+                await db.collection('announcements').add({ title, content, date: newAnn.date, authorUid: currentUser.uid });
+            };
+
+            // ── 공용 달력 핸들러 ─────────────────────────────────────────────
+            const handleAddEvent = async (day, text) => {
+                const now = new Date();
+                const newEvent = { id: String(Date.now()), day, text, color: 'bg-indigo-600', month: now.getMonth(), year: now.getFullYear() };
+                if (isLocalAdmin()) { setSharedEvents(prev => [...prev, newEvent]); return; }
+                await db.collection('events').add({ day, text, color: 'bg-indigo-600', month: now.getMonth(), year: now.getFullYear() });
+            };
+
+            // ── 자료실 핸들러 ────────────────────────────────────────────────
+            const handleAddResource = async (title, subject, description, files) => {
+                const now  = new Date();
+                const date = now.toLocaleDateString('ko-KR');
+                const time = now.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+                const fileArr = Array.from(files || []);
+                if (isLocalAdmin()) {
+                    setResources(prev => [{
+                        id: String(Date.now()), title, subject, description,
+                        authorName: currentUser.name, authorId: currentUser.id,
+                        date, time,
+                        files: fileArr.map(f => ({ fileName: f.name, downloadURL: null })),
+                        fileCount: fileArr.length,
+                    }, ...prev]);
+                    return;
+                }
+                const uploadedFiles = [];
+                for (const file of fileArr) {
+                    const sp  = `resources/${currentUser.uid}/${Date.now()}_${file.name}`;
+                    const ref = storage.ref(sp);
+                    const sn  = await ref.put(file);
+                    const url = await sn.ref.getDownloadURL();
+                    uploadedFiles.push({ fileName: file.name, storagePath: sp, downloadURL: url });
+                }
+                await db.collection('resources').add({
+                    title, subject, description,
+                    authorUid: currentUser.uid, authorName: currentUser.name,
+                    date, time,
+                    files: uploadedFiles,
+                    fileCount: uploadedFiles.length,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+            };
+
+            // ── 공용 달력 일정 삭제 ──────────────────────────────────────────
+            const handleDeleteEvent = async (id) => {
+                if (isLocalAdmin()) { setSharedEvents(prev => prev.filter(e => e.id !== id)); return; }
+                await db.collection('events').doc(id).delete().catch(() => {});
+            };
+
+            // ── 공부 핸들러 ──────────────────────────────────────────────────
+            const handleStudyStart = async (subject) => {
+                if (isLocalAdmin()) return;
+                for (const g of studyGroups) {
+                    db.collection('studyGroups').doc(g.id).collection('presence').doc(currentUser.uid).set(
+                        { isStudying: true, subject, lastUpdated: firebase.firestore.FieldValue.serverTimestamp() },
+                        { merge: true }
+                    ).catch(() => {});
+                }
+            };
+
+            const handleStudyStop = async (subject, durationSec, date) => {
+                if (durationSec < 5) return;
+                const newTotal = studyTime + durationSec;
+                setStudyTime(newTotal);
+                if (isLocalAdmin()) return;
+                const uid = currentUser.uid;
+                const batch = db.batch();
+                batch.set(db.collection('users').doc(uid).collection('studySessions').doc(), {
+                    subject, duration: durationSec, date,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                batch.set(db.collection('users').doc(uid).collection('studyDays').doc(date), {
+                    seconds: firebase.firestore.FieldValue.increment(durationSec),
+                    subjects: { [subject]: firebase.firestore.FieldValue.increment(durationSec) }
+                }, { merge: true });
+                batch.update(db.collection('users').doc(uid), {
+                    studyTime: newTotal, studyDate: date
+                });
+                await batch.commit().catch(() => {});
+                for (const g of studyGroups) {
+                    db.collection('studyGroups').doc(g.id).collection('presence').doc(uid).set(
+                        { isStudying: false, subject: '', todaySeconds: newTotal, lastUpdated: firebase.firestore.FieldValue.serverTimestamp() },
+                        { merge: true }
+                    ).catch(() => {});
+                }
+            };
+
+            const handleCreateStudyGroup = async (name) => {
+                const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+                if (isLocalAdmin()) {
+                    setStudyGroups(prev => [...prev, { id: `local-${Date.now()}`, name, code, members: [currentUser.uid], memberData: { [currentUser.uid]: { id: currentUser.id, name: currentUser.name } } }]);
+                    return;
+                }
+                await db.collection('studyGroups').add({
+                    name, code, members: [currentUser.uid],
+                    memberData: { [currentUser.uid]: { id: currentUser.id, name: currentUser.name } },
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+            };
+
+            const handleJoinStudyGroup = async (code) => {
+                if (isLocalAdmin()) { alert('로컬 어드민은 그룹 참여 불가'); return; }
+                const snap = await db.collection('studyGroups').where('code', '==', code.toUpperCase()).limit(1).get().catch(() => null);
+                if (!snap || snap.empty) { alert('잘못된 코드입니다.'); return; }
+                const doc = snap.docs[0];
+                if ((doc.data().members || []).includes(currentUser.uid)) { alert('이미 가입된 그룹입니다.'); return; }
+                await db.collection('studyGroups').doc(doc.id).update({
+                    members: firebase.firestore.FieldValue.arrayUnion(currentUser.uid),
+                    [`memberData.${currentUser.uid}`]: { id: currentUser.id, name: currentUser.name }
+                });
+            };
+
+            const handleLeaveStudyGroup = async (groupId) => {
+                if (isLocalAdmin()) { setStudyGroups(prev => prev.filter(g => g.id !== groupId)); return; }
+                await db.collection('studyGroups').doc(groupId).update({
+                    members: firebase.firestore.FieldValue.arrayRemove(currentUser.uid)
+                }).catch(() => {});
+            };
+
+            // ── 커뮤니티 핸들러 ──────────────────────────────────────────────
+            const handleAddPost = async (title, content, category) => {
+                const now = new Date();
+                const newPost = {
+                    title, content, category,
+                    authorId: currentUser.id,
+                    authorName: currentUser.name,
+                    date: now.toLocaleDateString('ko-KR'),
+                    time: now.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
+                    views: 0, likes: 0,
+                    createdAt: now.toISOString(),
+                };
+                if (isLocalAdmin()) {
+                    setPosts(prev => [{ id: String(Date.now()), ...newPost }, ...prev]);
+                    return;
+                }
+                await db.collection('posts').add({
+                    ...newPost,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+            };
+
+            // ── 메시지(대화방) 핸들러 ────────────────────────────────────────
+            const handleCreateRoom = async (memberIdsStr, groupName) => {
+                const targetIds = memberIdsStr.split(',').map(s => s.trim()).filter(Boolean);
+                if (!targetIds.length) return null;
+                const allIds = [currentUser.id, ...targetIds.filter(id => id !== currentUser.id)];
+                const isGroup = allIds.length > 2;
+                const roomName = groupName.trim() || (isGroup ? targetIds.join(', ') : targetIds[0]);
+
+                if (isLocalAdmin()) {
+                    const newRoom = {
+                        id: `local-${Date.now()}`,
+                        members: [currentUser.uid, ...targetIds],
+                        memberIds: allIds,
+                        memberNames: { [currentUser.uid]: currentUser.name },
+                        isGroup, name: roomName,
+                        lastMessage: '', lastTime: new Date().toISOString(),
+                    };
+                    setRooms(prev => [newRoom, ...prev]);
+                    return newRoom.id;
+                }
+
+                const memberUids = [currentUser.uid];
+                const memberIds  = [currentUser.id];
+                const memberNames = { [currentUser.uid]: currentUser.name };
+                for (const id of targetIds) {
+                    if (id === currentUser.id) continue;
+                    try {
+                        const snap = await db.collection('userIds').doc(id).get();
+                        if (!snap.exists) { alert(`'${id}' 사용자를 찾을 수 없습니다.`); return null; }
+                        const uid = snap.data().uid;
+                        const uSnap = await db.collection('users').doc(uid).get();
+                        memberUids.push(uid); memberIds.push(id);
+                        memberNames[uid] = uSnap.data()?.name || id;
+                    } catch { return null; }
+                }
+                const isGroupFinal = memberUids.length > 2;
+                const ref = await db.collection('rooms').add({
+                    members: memberUids, memberIds, memberNames,
+                    isGroup: isGroupFinal,
+                    name: groupName.trim() || (isGroupFinal
+                        ? memberIds.filter(id => id !== currentUser.id).join(', ')
+                        : memberIds.find(id => id !== currentUser.id) || ''),
+                    lastMessage: '',
+                    lastTime: firebase.firestore.FieldValue.serverTimestamp(),
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                });
+                return ref.id;
+            };
+
+            const handleSendInRoom = async (roomId, text) => {
+                const now = new Date();
+                const timeStr = now.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+                if (isLocalAdmin()) {
+                    const newMsg = { id: String(Date.now()), fromUid: 'local-admin', fromId: currentUser.id, fromName: currentUser.name, text, time: timeStr, createdAt: now.toISOString() };
+                    setLocalRoomMessages(prev => ({ ...prev, [roomId]: [...(prev[roomId] || []), newMsg] }));
+                    setRooms(prev => prev.map(r => r.id === roomId ? { ...r, lastMessage: text, lastTime: now.toISOString() } : r));
+                    return;
+                }
+                await db.collection('rooms').doc(roomId).collection('messages').add({
+                    fromUid: currentUser.uid, fromId: currentUser.id, fromName: currentUser.name,
+                    text, time: timeStr,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                });
+                await db.collection('rooms').doc(roomId).update({
+                    lastMessage: text,
+                    lastTime: firebase.firestore.FieldValue.serverTimestamp(),
+                }).catch(() => {});
+            };
+
+            // ── 로딩 / 미인증 화면 ───────────────────────────────────────────
+            if (loading) return (
+                <div style={{height:'100vh', width:'100vw', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', background:'#000', gap:'20px'}}>
+                    <div style={{fontSize:'36px', fontWeight:900, letterSpacing:'-1px', color:'#fff', animation:'fadeIn 0.6s ease'}}>
+                        HIGH.<span style={{color:'#60a5fa'}}>ST</span>
+                    </div>
+                    <div style={{width:'40px', height:'40px', border:'3px solid rgba(96,165,250,0.2)', borderTop:'3px solid #60a5fa', borderRadius:'50%', animation:'spin 0.8s linear infinite'}}></div>
+                </div>
+            );
+
+            if (!currentUser) return <AuthPage onAuth={handleAuth} />;
+
+            const canManageSystem = userRole === '선생님' || userRole === '관리자';
+
+            return (
+                <div style={{display:'flex', height:'100vh', width:'100vw', overflow:'hidden'}}>
+                    {/* ── 사이드바 ─────────────────────────────────────── */}
+                    <aside className="sidebar">
+                        {/* 로고 */}
+                        <div style={{fontSize:'22px', fontWeight:900, letterSpacing:'-0.5px', marginBottom:'24px', paddingLeft:'8px', color:'var(--text)'}}>
+                            HIGH.<span style={{color:'var(--accent)'}}>ST</span>
+                        </div>
+
+                        {/* 유저 카드 */}
+                        <div className="glass-inset" style={{padding:'14px 16px', marginBottom:'20px', position:'relative'}}>
+                            <div style={{position:'absolute', top:'10px', right:'12px'}}>
+                                <span className={`badge ${userRole==='학생'?'badge-student':userRole==='선생님'?'badge-teacher':'badge-admin'}`}>{userRole}</span>
+                            </div>
+                            <div style={{display:'flex', alignItems:'center', gap:'12px'}}>
+                                <div style={{width:'44px', height:'44px', borderRadius:'14px', background:'linear-gradient(135deg, var(--accent), var(--accent2))', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'20px', flexShrink:0, boxShadow:'0 4px 12px rgba(79,110,247,0.3)'}}>🎓</div>
+                                <div style={{overflow:'hidden'}}>
+                                    <div style={{fontWeight:800, fontSize:'14px', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', color:'var(--text)'}}>{currentUser.name}</div>
+                                    <div style={{fontSize:'10px', fontWeight:700, opacity:0.4, textTransform:'uppercase', letterSpacing:'0.08em', marginTop:'2px'}}>{currentUser.school}</div>
+                                </div>
+                            </div>
+                            <div style={{marginTop:'10px', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                                <span style={{fontSize:'10px', fontWeight:700, opacity:0.35}}>수능까지</span>
+                                <span style={{fontSize:'12px', fontWeight:900, color:'var(--accent)'}}>{getDDay(suneungDate)}</span>
+                            </div>
+                        </div>
+
+                        {/* 네비게이션 */}
+                        <nav style={{flex:1, overflowY:'auto'}}>
+                            <div className="nav-label">Individual</div>
+                            {[['대시보드','🏠','메인 대시보드'],['학습','⏱️','학습 & 플래너'],['플래너','📅','데일리 플래너']].map(([v,ic,lb],i) => (
+                                <button key={v} className={`nav-item${view===v?' active':''}`} style={{animationDelay:`${i*0.05}s`}} onClick={()=>setView(v)}>
+                                    <span className="icon">{ic}</span>{lb}
+                                </button>
+                            ))}
+                            <div className="nav-label" style={{marginTop:'20px'}}>Collective</div>
+                            {[['공지사항','📢','공지사항'],['커뮤니티','🔥','커뮤니티'],['공용달력','🗓️','공용 달력'],['자료실','📚','학습 자료실'],['메시지','💬','다이렉트 메시지']].map(([v,ic,lb],i) => (
+                                <button key={v} className={`nav-item${view===v?' active':''}`} style={{animationDelay:`${(i+2)*0.05}s`}} onClick={()=>setView(v)}>
+                                    <span className="icon">{ic}</span>{lb}
+                                </button>
+                            ))}
+                            <div className="nav-label" style={{marginTop:'20px'}}>Settings</div>
+                            <button className={`nav-item${view==='설정'?' active':''}`} onClick={()=>setView('설정')}>
+                                <span className="icon">⚙️</span>계정 및 설정
+                            </button>
+                        </nav>
+
+                        {/* 오늘 공부 시간 미니 표시 */}
+                        <div className="timer-box" style={{marginTop:'16px', padding:'14px 16px'}}>
+                            <div style={{fontSize:'9px', fontWeight:900, color:'var(--accent)', textTransform:'uppercase', letterSpacing:'0.2em', marginBottom:'6px', textAlign:'center'}}>Today's Study</div>
+                            <div style={{textAlign:'center', fontSize:'22px', fontWeight:900, color:'#fff', letterSpacing:'-0.5px'}}>
+                                {Math.floor(studyTime/3600).toString().padStart(2,'0')}:{Math.floor((studyTime%3600)/60).toString().padStart(2,'0')}
+                                <span style={{fontSize:'14px', opacity:0.5}}>:{(studyTime%60).toString().padStart(2,'0')}</span>
+                            </div>
+                            <button onClick={()=>setView('학습')} style={{width:'100%', marginTop:'10px', padding:'9px', borderRadius:'14px', border:'none', cursor:'pointer', fontWeight:900, fontSize:'11px', letterSpacing:'0.06em', textTransform:'uppercase', background:'var(--accent)', color:'#fff', boxShadow:'0 4px 16px rgba(79,110,247,0.35)'}}>
+                                ▶ 공부 시작
+                            </button>
+                        </div>
+                    </aside>
+
+                    {/* ── 메인 영역 ─────────────────────────────────────── */}
+                    <main style={{flex:1, overflowY:'auto', display:'flex', flexDirection:'column'}}>
+                        <header className="main-header">
+                            <div>
+                                <h2 style={{fontSize:'22px', fontWeight:900, letterSpacing:'-0.3px', color:'var(--text)', margin:0}}>{view}</h2>
+                                <p style={{fontSize:'10px', fontWeight:700, opacity:0.35, textTransform:'uppercase', letterSpacing:'0.2em', marginTop:'3px'}}>Premium Learning Space</p>
+                            </div>
+                            <button className="btn-danger" onClick={handleLogout}>Exit System</button>
+                        </header>
+
+                        <div style={{padding:'28px 36px 48px', flex:1}}>
+                            {view === '대시보드' && (
+                                <Dashboard
+                                    announcements={announcements}
+                                    todos={todos}
+                                    resources={resources}
+                                    posts={posts}
+                                    studyTime={studyTime}
+                                    suneungDate={suneungDate}
+                                    getDDay={getDDay}
+                                    setView={setView}
+                                />
+                            )}
+                            {view === '학습' && (
+                                <StudyView
+                                    currentUser={currentUser}
+                                    studyGroups={studyGroups}
+                                    studyTime={studyTime}
+                                    suneungDate={suneungDate}
+                                    getDDay={getDDay}
+                                    todos={todos}
+                                    selectedDate={selectedDate}
+                                    setSelectedDate={setSelectedDate}
+                                    onAddTodo={handleAddTodo}
+                                    onToggleTodo={handleToggleTodo}
+                                    onDeleteTodo={handleDeleteTodo}
+                                    onStudyStart={handleStudyStart}
+                                    onStudyStop={handleStudyStop}
+                                    onCreateGroup={handleCreateStudyGroup}
+                                    onJoinGroup={handleJoinStudyGroup}
+                                    onLeaveGroup={handleLeaveStudyGroup}
+                                />
+                            )}
+                            {view === '커뮤니티' && (
+                                <CommunityView
+                                    posts={posts}
+                                    currentUser={currentUser}
+                                    onAddPost={handleAddPost}
+                                />
+                            )}
+                            {view === '공지사항' && (
+                                <NoticeView
+                                    isAdmin={canManageSystem}
+                                    announcements={announcements}
+                                    onAdd={handleAddAnnouncement}
+                                />
+                            )}
+                            {view === '플래너' && (
+                                <Planner
+                                    todos={todos}
+                                    selectedDate={selectedDate}
+                                    setSelectedDate={setSelectedDate}
+                                    onAdd={handleAddTodo}
+                                    onToggle={handleToggleTodo}
+                                    onDelete={handleDeleteTodo}
+                                />
+                            )}
+                            {view === '공용달력' && (
+                                <CalendarView
+                                    isAdmin={canManageSystem}
+                                    sharedEvents={sharedEvents}
+                                    onAddEvent={handleAddEvent}
+                                    onDeleteEvent={handleDeleteEvent}
+                                />
+                            )}
+                            {view === '자료실' && (
+                                <ResourceView
+                                    resources={resources}
+                                    currentUser={currentUser}
+                                    onAdd={handleAddResource}
+                                />
+                            )}
+                            {view === '메시지' && (
+                                <MessageView
+                                    rooms={rooms}
+                                    currentUser={currentUser}
+                                    localRoomMessages={localRoomMessages}
+                                    onCreateRoom={handleCreateRoom}
+                                    onSendInRoom={handleSendInRoom}
+                                />
+                            )}
+                            {view === '설정' && (
+                                <SettingsView
+                                    currentUser={currentUser}
+                                    userRole={userRole}
+                                    theme={theme}
+                                    suneungDate={suneungDate}
+                                    getDDay={getDDay}
+                                    onThemeChange={async (t) => { setTheme(t); await saveProfile({ theme: t }); }}
+                                    onRoleChange={async (r) => { setUserRole(r); await saveProfile({ role: r }); }}
+                                    onSuneungChange={async (d) => { setSuneungDate(d); await saveProfile({ suneungDate: d }); }}
+                                    onSchoolChange={async (s) => await saveProfile({ school: s })}
+                                />
+                            )}
+                        </div>
+                    </main>
+                </div>
+            );
+        }
+
+        // ─── StudyHeatmap ────────────────────────────────────────────────────
+
+        function StudyHeatmap({ heatmapData }) {
+            const CELL = 13, GAP = 3;
+            const DAYS_KR = ['일','월','화','수','목','금','토'];
+
+            const { weeks, monthLabels } = useMemo(() => {
+                const today = new Date(); today.setHours(0,0,0,0);
+                const todayStr = today.toISOString().split('T')[0];
+                // end on nearest Saturday
+                const end = new Date(today);
+                while (end.getDay() !== 6) end.setDate(end.getDate() + 1);
+                // start 26 weeks back, on Sunday
+                const start = new Date(end);
+                start.setDate(start.getDate() - 26 * 7 + 1);
+                while (start.getDay() !== 0) start.setDate(start.getDate() - 1);
+
+                const weeks = [];
+                const monthLabels = {};
+                let week = [];
+                const cur = new Date(start);
+
+                while (cur <= end) {
+                    const dayOfWeek = cur.getDay();
+                    if (dayOfWeek === 0 && week.length > 0) { weeks.push(week); week = []; }
+                    const dateStr = cur.toISOString().split('T')[0];
+                    week.push(cur <= today ? dateStr : null);
+                    // month label: first week a month appears
+                    if (cur.getDate() === 1) monthLabels[weeks.length] = cur.getMonth() + 1;
+                    cur.setDate(cur.getDate() + 1);
+                }
+                if (week.length) weeks.push(week);
+                if (!Object.keys(monthLabels).length) monthLabels[0] = new Date(start).getMonth() + 1;
+                return { weeks, monthLabels };
+            }, []);
+
+            const getColor = (sec) => {
+                if (!sec) return null;
+                const m = sec / 60;
+                if (m < 60)  return 'rgba(79,110,247,0.20)'; // < 1h
+                if (m < 120) return 'rgba(79,110,247,0.42)'; // 1-2h
+                if (m < 240) return 'rgba(79,110,247,0.65)'; // 2-4h
+                if (m < 360) return 'rgba(79,110,247,0.82)'; // 4-6h
+                return 'rgba(79,110,247,0.97)';               // 6h+
+            };
+
+            const todayStr = new Date().toISOString().split('T')[0];
+
+            return (
+                <div className="glass-card" style={{padding:'24px 28px', marginTop:'16px', overflowX:'auto'}}>
+                    <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'16px'}}>
+                        <h4 style={{fontSize:'14px', fontWeight:900, color:'var(--text)'}}>📊 학습 기록</h4>
+                        <div style={{display:'flex', alignItems:'center', gap:'6px', fontSize:'10px', fontWeight:700, opacity:0.4}}>
+                            <span>적음</span>
+                            {[0.20,0.42,0.65,0.82,0.97].map((o,i) => <div key={i} style={{width:'12px',height:'12px',borderRadius:'3px',background:`rgba(79,110,247,${o})`}}/>)}
+                            <span>많음</span>
+                        </div>
+                    </div>
+                    <div style={{display:'flex', gap:`${GAP}px`}}>
+                        {/* 요일 라벨 */}
+                        <div style={{display:'flex', flexDirection:'column', gap:`${GAP}px`, paddingTop:'18px', flexShrink:0}}>
+                            {DAYS_KR.map((d,i) => (
+                                <div key={d} style={{height:`${CELL}px`, fontSize:'9px', fontWeight:800, opacity:[1,3,5].includes(i)?0.4:0, color:'var(--text-sub)', display:'flex', alignItems:'center', paddingRight:'6px', minWidth:'16px'}}>{d}</div>
+                            ))}
+                        </div>
+                        {/* 주 열들 */}
+                        <div style={{display:'flex', flexDirection:'column'}}>
+                            {/* 월 라벨 행 */}
+                            <div style={{display:'flex', gap:`${GAP}px`, marginBottom:'4px', height:'14px'}}>
+                                {weeks.map((_,wi) => (
+                                    <div key={wi} style={{width:`${CELL}px`, flexShrink:0, fontSize:'9px', fontWeight:800, color:'var(--text-sub)', opacity:monthLabels[wi]?0.45:0, whiteSpace:'nowrap'}}>
+                                        {monthLabels[wi]?`${monthLabels[wi]}월`:''}
+                                    </div>
+                                ))}
+                            </div>
+                            {/* 7행 × N열 그리드 */}
+                            {[0,1,2,3,4,5,6].map(dow => (
+                                <div key={dow} style={{display:'flex', gap:`${GAP}px`, marginBottom:`${GAP}px`}}>
+                                    {weeks.map((week,wi) => {
+                                        const date = week[dow];
+                                        const sec = date ? (heatmapData[date] || 0) : 0;
+                                        const color = getColor(sec);
+                                        const isToday = date === todayStr;
+                                        const min = Math.round(sec/60);
+                                        const label = date ? (min>=60 ? `${Math.floor(min/60)}h ${min%60}m` : min>0 ? `${min}m` : '기록없음') : '';
+                                        return (
+                                            <div key={wi} title={date?`${date} ${label}`:''}
+                                                style={{width:`${CELL}px`, height:`${CELL}px`, flexShrink:0, borderRadius:'3px',
+                                                    background: date?(color||'var(--glass-bg2)'):'transparent',
+                                                    border: isToday?'1.5px solid var(--accent)':date?'1px solid rgba(255,255,255,0.04)':'none',
+                                                    transition:'transform 0.1s', cursor:date?'default':'default'}}
+                                                onMouseEnter={e=>{if(date)e.currentTarget.style.transform='scale(1.4)';}}
+                                                onMouseLeave={e=>{e.currentTarget.style.transform='';}}
+                                            />
+                                        );
+                                    })}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // ─── StudyView ───────────────────────────────────────────────────────
+
+        function StudyView({ currentUser, studyGroups, studyTime, suneungDate, getDDay, todos, selectedDate, setSelectedDate, onAddTodo, onToggleTodo, onDeleteTodo, onStudyStart, onStudyStop, onCreateGroup, onJoinGroup, onLeaveGroup }) {
+            const [isTimerOn,      setIsTimerOn]      = useState(false);
+            const [isPaused,       setIsPaused]       = useState(false);
+            const [isStopping,     setIsStopping]     = useState(false);
+            const [btnKey,         setBtnKey]         = useState(0);
+            const [timerSec,       setTimerSec]       = useState(0);
+            const [currentSubject, setCurrentSubject] = useState('수학');
+            const [forceMinutes,   setForceMinutes]   = useState('');
+            const [forceSubject,   setForceSubject]   = useState('수학');
+            const [todaySessions,  setTodaySessions]  = useState([]);
+            const [groupPresence,  setGroupPresence]  = useState({});
+            const [heatmapData,    setHeatmapData]    = useState({});
+            const [showCreate,     setShowCreate]     = useState(false);
+            const [showJoin,       setShowJoin]       = useState(false);
+            const [newGroupName,   setNewGroupName]   = useState('');
+            const [joinCode,       setJoinCode]       = useState('');
+            const [creating,       setCreating]       = useState(false);
+            const [joining,        setJoining]        = useState(false);
+            const sessionStartRef = useRef(null);
+            const isLocalAdmin = currentUser?.uid === 'local-admin';
+            const today = new Date().toISOString().split('T')[0];
+
+            // 타이머 인터벌 (일시 정지 상태에서는 멈춤)
+            useEffect(() => {
+                let iv;
+                if (isTimerOn && !isPaused) iv = setInterval(() => setTimerSec(p => p + 1), 1000);
+                return () => clearInterval(iv);
+            }, [isTimerOn, isPaused]);
+
+            // 오늘 세션 로드
+            useEffect(() => {
+                if (isLocalAdmin || !currentUser) return;
+                db.collection('users').doc(currentUser.uid).collection('studySessions')
+                    .where('date', '==', today).orderBy('createdAt', 'desc').get()
+                    .then(snap => setTodaySessions(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
+                    .catch(() => {});
+            }, [currentUser?.uid]);
+
+            // 히트맵 데이터 로드
+            useEffect(() => {
+                if (isLocalAdmin || !currentUser) return;
+                const startDate = new Date(); startDate.setDate(startDate.getDate() - 182);
+                const startStr = startDate.toISOString().split('T')[0];
+                db.collection('users').doc(currentUser.uid).collection('studyDays')
+                    .where(firebase.firestore.FieldPath.documentId(), '>=', startStr).get()
+                    .then(snap => {
+                        const data = {};
+                        snap.docs.forEach(d => { data[d.id] = d.data().seconds || 0; });
+                        setHeatmapData(data);
+                    }).catch(() => {});
+            }, [currentUser?.uid]);
+
+            // 그룹 presence 구독
+            useEffect(() => {
+                if (!studyGroups.length || isLocalAdmin) return;
+                const unsubs = studyGroups.map(g =>
+                    db.collection('studyGroups').doc(g.id).collection('presence')
+                        .onSnapshot(snap => {
+                            const p = {};
+                            snap.docs.forEach(d => { p[d.id] = d.data(); });
+                            setGroupPresence(prev => ({ ...prev, [g.id]: p }));
+                        }, () => {})
+                );
+                return () => unsubs.forEach(u => u());
+            }, [studyGroups.map(g => g.id).join(',')]);
+
+            const fmt = (s) => `${Math.floor(s/3600).toString().padStart(2,'0')}:${Math.floor((s%3600)/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`;
+            const fmtMin = (s) => { const m = Math.floor(s/60); const h = Math.floor(m/60); return h > 0 ? `${h}시간 ${m%60}분` : `${m}분`; };
+            const subjectColor = SUBJECTS.find(s => s.id === currentSubject)?.color || '#4f6ef7';
+
+            const startTimer = async () => {
+                sessionStartRef.current = new Date();
+                setTimerSec(0); setIsTimerOn(true); setIsPaused(false);
+                setBtnKey(k => k + 1); // 버튼 재마운트 → 분리 애니메이션 재생
+                await onStudyStart(currentSubject);
+            };
+
+            const pauseTimer = () => setIsPaused(true);
+            const resumeTimer = () => setIsPaused(false);
+
+            const handleStopClick = () => {
+                if (isStopping) return;
+                setIsStopping(true);
+                // stopTimer() is called by onAnimationEnd on right button
+            };
+
+            const stopTimer = async () => {
+                setIsTimerOn(false); setIsPaused(false); setIsStopping(false);
+                const dur = timerSec;
+                if (dur < 5) { setTimerSec(0); return; }
+                const startStr = sessionStartRef.current?.toLocaleTimeString('ko-KR', {hour:'2-digit',minute:'2-digit'}) || '';
+                const session = { id: String(Date.now()), subject: currentSubject, duration: dur, date: today, startTime: startStr };
+                setTodaySessions(prev => [session, ...prev]);
+                setHeatmapData(prev => ({ ...prev, [today]: (prev[today] || 0) + dur }));
+                setTimerSec(0);
+                await onStudyStop(currentSubject, dur, today);
+            };
+
+            const forceAddTime = async () => {
+                const min = parseInt(forceMinutes, 10);
+                if (!min || min <= 0) return;
+                const dur = min * 60;
+                const startStr = new Date().toLocaleTimeString('ko-KR', {hour:'2-digit',minute:'2-digit'});
+                const session = { id: String(Date.now()), subject: forceSubject, duration: dur, date: today, startTime: startStr };
+                setTodaySessions(prev => [session, ...prev]);
+                setHeatmapData(prev => ({ ...prev, [today]: (prev[today] || 0) + dur }));
+                setForceMinutes('');
+                await onStudyStop(forceSubject, dur, today);
+            };
+
+            const createGroup = async () => {
+                if (!newGroupName.trim() || creating) return;
+                setCreating(true); await onCreateGroup(newGroupName.trim());
+                setCreating(false); setNewGroupName(''); setShowCreate(false);
+            };
+
+            const joinGroup = async () => {
+                if (!joinCode.trim() || joining) return;
+                setJoining(true); await onJoinGroup(joinCode.trim());
+                setJoining(false); setJoinCode(''); setShowJoin(false);
+            };
+
+            const todayTodos = todos.filter(t => t.date === today);
+            const todayDone  = todayTodos.filter(t => t.completed).length;
+
+            return (
+                <div className="anim-fade-up">
+                    <div style={{display:'grid', gridTemplateColumns:'1fr 320px', gap:'16px', alignItems:'start'}}>
+
+                        {/* ── 왼쪽: 타이머 + 플래너 ── */}
+                        <div style={{display:'flex', flexDirection:'column', gap:'16px'}}>
+
+                            {/* 타이머 카드 */}
+                            <div className="glass-card-lg" style={{padding:'28px 32px'}}>
+                                {/* 과목 선택 */}
+                                <div style={{marginBottom:'24px'}}>
+                                    <p style={{fontSize:'9px', fontWeight:900, opacity:0.35, textTransform:'uppercase', letterSpacing:'0.2em', marginBottom:'12px', color:'var(--text)'}}>과목 선택</p>
+                                    <div style={{display:'flex', gap:'8px', flexWrap:'wrap'}}>
+                                        {SUBJECTS.map(s => (
+                                            <button key={s.id} onClick={()=>{ if(!isTimerOn) setCurrentSubject(s.id); }}
+                                                style={{padding:'8px 18px', borderRadius:'99px', border:currentSubject===s.id?`2px solid ${s.color}`:'1.5px solid var(--glass-border)', background:currentSubject===s.id?`${s.color}22`:'var(--glass-bg2)', cursor:isTimerOn&&currentSubject!==s.id?'not-allowed':'pointer', fontSize:'12px', fontWeight:800, color:currentSubject===s.id?s.color:'var(--text-sub)', fontFamily:'Pretendard,sans-serif', transition:'all 0.15s', opacity:isTimerOn&&currentSubject!==s.id?0.3:1}}>
+                                                {s.icon} {s.id}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* 타이머 디스플레이 */}
+                                <div style={{textAlign:'center', marginBottom:'24px'}}>
+                                    <div style={{fontSize:'11px', fontWeight:900, textTransform:'uppercase', letterSpacing:'0.2em', color:isTimerOn?(isPaused?'#f59e0b':subjectColor):'var(--text-sub)', opacity:0.6, marginBottom:'10px'}}>
+                                        {isTimerOn ? (isPaused ? '⏸ 일시 정지' : `${currentSubject} 공부 중`) : 'Ready'}
+                                    </div>
+                                    <div style={{fontSize:'60px', fontWeight:900, letterSpacing:'-2px', color:isTimerOn?(isPaused?'#f59e0b':subjectColor):'var(--text)', fontVariantNumeric:'tabular-nums', lineHeight:1, animation:isTimerOn&&!isPaused?'timerPulse 2s ease infinite':'none'}}>
+                                        {fmt(timerSec)}
+                                    </div>
+                                    <div style={{fontSize:'11px', fontWeight:700, opacity:0.3, marginTop:'8px'}}>오늘 누적 {fmtMin(studyTime + (isTimerOn ? timerSec : 0))}</div>
+                                </div>
+
+                                {/* ── 버튼 영역 ── */}
+                                {!isTimerOn ? (
+                                    /* 공부 시작 — 단일 버튼 */
+                                    <button onClick={startTimer}
+                                        style={{width:'100%', padding:'16px', borderRadius:'20px', border:'none', cursor:'pointer', fontWeight:900, fontSize:'14px', letterSpacing:'0.06em', textTransform:'uppercase', fontFamily:'Pretendard,sans-serif', color:'#fff',
+                                            background:`linear-gradient(135deg, ${subjectColor}, #818cf8)`,
+                                            boxShadow:`0 6px 24px ${subjectColor}55`, transition:'transform 0.15s, box-shadow 0.15s'}}
+                                        onMouseEnter={e=>{e.currentTarget.style.transform='translateY(-1px)'; e.currentTarget.style.boxShadow=`0 10px 28px ${subjectColor}66`;}}
+                                        onMouseLeave={e=>{e.currentTarget.style.transform=''; e.currentTarget.style.boxShadow=`0 6px 24px ${subjectColor}55`;}}>
+                                        ▶ 공부 시작
+                                    </button>
+                                ) : (
+                                    /* 분리된 두 버튼 — Liquid Glass 스플릿 */
+                                    <div key={btnKey} style={{display:'flex', gap:'6px'}}>
+                                        {/* 일시 정지 / 계속하기 — Liquid Glass */}
+                                        <button
+                                            onClick={!isStopping ? (isPaused ? resumeTimer : pauseTimer) : undefined}
+                                            style={{flex:1, padding:'15px 0', borderRadius:'18px', border:'1px solid rgba(255,255,255,0.18)', cursor: isStopping ? 'default' : 'pointer', fontWeight:900, fontSize:'13px', letterSpacing:'0.04em', fontFamily:'Pretendard,sans-serif',
+                                                color: isPaused ? 'var(--accent)' : 'var(--text)',
+                                                background: isPaused ? 'rgba(79,110,247,0.18)' : 'rgba(255,255,255,0.10)',
+                                                backdropFilter:'blur(24px) saturate(200%)', WebkitBackdropFilter:'blur(24px) saturate(200%)',
+                                                boxShadow:'0 6px 24px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.22)',
+                                                transition:'background 0.2s, color 0.2s',
+                                                animation: isStopping
+                                                    ? 'mergeBtnLeft 0.38s cubic-bezier(0.4,0,1,1) both'
+                                                    : 'splitBtnLeft 0.48s cubic-bezier(0.34,1.4,0.64,1) both'}}>
+                                            {isPaused ? '▶ 계속하기' : '⏸ 일시 정지'}
+                                        </button>
+                                        {/* 학습 종료 */}
+                                        <button
+                                            onClick={!isStopping ? handleStopClick : undefined}
+                                            onAnimationEnd={() => { if (isStopping) stopTimer(); }}
+                                            style={{flex:1, padding:'15px 0', borderRadius:'18px', border:'none', cursor: isStopping ? 'default' : 'pointer', fontWeight:900, fontSize:'13px', letterSpacing:'0.04em', fontFamily:'Pretendard,sans-serif', color:'#fff',
+                                                background:'linear-gradient(135deg, #ef4444, #dc2626)',
+                                                boxShadow:'0 6px 20px rgba(239,68,68,0.42)',
+                                                animation: isStopping
+                                                    ? 'mergeBtnRight 0.38s cubic-bezier(0.4,0,1,1) both'
+                                                    : 'splitBtnRight 0.48s cubic-bezier(0.34,1.4,0.64,1) both'}}>
+                                            ⏹ 학습 종료
+                                        </button>
+                                    </div>
+                                )}
+
+                                {/* ── 관리자 전용: 공부 시간 강제 추가 ── */}
+                                {currentUser?.role === '관리자' && !isTimerOn && (
+                                    <div style={{marginTop:'16px', padding:'16px 18px', borderRadius:'16px', border:'1px dashed rgba(251,191,36,0.35)', background:'rgba(251,191,36,0.05)'}}>
+                                        <p style={{fontSize:'9px', fontWeight:900, color:'#f59e0b', textTransform:'uppercase', letterSpacing:'0.2em', marginBottom:'12px', display:'flex', alignItems:'center', gap:'6px'}}>
+                                            👑 관리자 — 공부 시간 추가
+                                        </p>
+                                        <div style={{display:'flex', gap:'8px', alignItems:'center'}}>
+                                            <select value={forceSubject} onChange={e=>setForceSubject(e.target.value)}
+                                                style={{flex:'0 0 auto', padding:'9px 12px', borderRadius:'12px', background:'var(--glass-bg2)', border:'1.5px solid var(--glass-border)', color:'var(--text)', fontFamily:'Pretendard,sans-serif', fontWeight:800, fontSize:'12px', cursor:'pointer'}}>
+                                                {SUBJECTS.map(s => <option key={s.id} value={s.id}>{s.icon} {s.id}</option>)}
+                                            </select>
+                                            <input type="number" min="1" max="600" value={forceMinutes} onChange={e=>setForceMinutes(e.target.value)}
+                                                onKeyDown={e=>e.key==='Enter'&&forceAddTime()}
+                                                placeholder="분 입력"
+                                                style={{flex:1, fontSize:'13px', fontWeight:800, textAlign:'center'}} />
+                                            <button onClick={forceAddTime} disabled={!forceMinutes || parseInt(forceMinutes)<=0}
+                                                style={{flexShrink:0, padding:'9px 16px', borderRadius:'12px', border:'none', cursor:'pointer', fontWeight:900, fontSize:'12px', fontFamily:'Pretendard,sans-serif', color:'#000', background:'#f59e0b', opacity:!forceMinutes?0.4:1, transition:'opacity 0.15s'}}>
+                                                추가
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* 오늘 세션 */}
+                                {todaySessions.length > 0 && (
+                                    <div style={{marginTop:'24px'}}>
+                                        <p style={{fontSize:'9px', fontWeight:900, opacity:0.35, textTransform:'uppercase', letterSpacing:'0.2em', marginBottom:'10px', color:'var(--text)'}}>오늘의 세션</p>
+                                        <div style={{display:'flex', flexDirection:'column', gap:'6px'}}>
+                                            {todaySessions.map((s,i) => {
+                                                const sc = SUBJECTS.find(x=>x.id===s.subject);
+                                                return (
+                                                    <div key={s.id||i} className="glass-inset" style={{padding:'9px 14px', display:'flex', alignItems:'center', justifyContent:'space-between'}}>
+                                                        <div style={{display:'flex', alignItems:'center', gap:'10px'}}>
+                                                            <div style={{width:'8px',height:'8px',borderRadius:'50%',background:sc?.color||'var(--accent)',flexShrink:0}}></div>
+                                                            <span style={{fontSize:'13px',fontWeight:800,color:'var(--text)'}}>{s.subject}</span>
+                                                            {s.startTime && <span style={{fontSize:'10px',fontWeight:700,opacity:0.3}}>{s.startTime}</span>}
+                                                        </div>
+                                                        <span style={{fontSize:'13px',fontWeight:900,color:sc?.color||'var(--accent)',fontVariantNumeric:'tabular-nums'}}>{fmt(s.duration||0)}</span>
+                                                    </div>
+                                                );
+                                            })}
+                                            <div className="glass-inset" style={{padding:'9px 14px',display:'flex',justifyContent:'space-between',background:'rgba(79,110,247,0.06)'}}>
+                                                <span style={{fontSize:'12px',fontWeight:900,opacity:0.5}}>오늘 합계</span>
+                                                <span style={{fontSize:'13px',fontWeight:900,color:'var(--accent)'}}>{fmtMin(studyTime)}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* 플래너 카드 (오늘) */}
+                            <div className="glass-card" style={{padding:'24px 28px'}}>
+                                <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'16px'}}>
+                                    <h4 style={{fontSize:'14px', fontWeight:900, color:'var(--text)'}}>📅 오늘의 플래너</h4>
+                                    <span style={{fontSize:'11px', fontWeight:700, opacity:0.35}}>{todayDone}/{todayTodos.length} 완료</span>
+                                </div>
+                                {todayTodos.length > 0 && (
+                                    <div style={{height:'4px', background:'var(--glass-bg2)', borderRadius:'99px', marginBottom:'14px', overflow:'hidden'}}>
+                                        <div style={{height:'100%', width:`${todayTodos.length?Math.round(todayDone/todayTodos.length*100):0}%`, background:`linear-gradient(90deg, var(--accent), var(--accent2))`, borderRadius:'99px', transition:'width 0.4s'}}></div>
+                                    </div>
+                                )}
+                                <div style={{display:'flex', gap:'8px', marginBottom:'12px'}}>
+                                    <input id="study-todo-input" placeholder="⏎  새 목표 입력 후 Enter" style={{flex:1, fontSize:'13px'}}
+                                        onKeyDown={async e=>{if(e.key==='Enter'&&e.target.value.trim()){await onAddTodo(e.target.value.trim(),today);e.target.value='';}}} />
+                                </div>
+                                <div style={{display:'flex', flexDirection:'column', gap:'6px', maxHeight:'240px', overflowY:'auto'}}>
+                                    {todayTodos.map((t,i) => (
+                                        <div key={t.id} className="todo-item" style={{animationDelay:`${i*0.04}s`}}>
+                                            <div style={{display:'flex', alignItems:'center', gap:'12px', flex:1}}>
+                                                <div onClick={()=>onToggleTodo(t.id)} style={{width:'22px',height:'22px',borderRadius:'7px',flexShrink:0,cursor:'pointer',transition:'all 0.2s',border:t.completed?'none':'2px solid var(--glass-border)',background:t.completed?'var(--accent)':'transparent',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:t.completed?'0 2px 8px rgba(79,110,247,0.35)':'none'}}>
+                                                    {t.completed&&<span style={{color:'#fff',fontSize:'11px',fontWeight:900}}>✓</span>}
+                                                </div>
+                                                <span style={{fontSize:'13px',fontWeight:700,color:'var(--text)',textDecoration:t.completed?'line-through':'none',opacity:t.completed?0.3:1,transition:'all 0.2s'}}>{t.text}</span>
+                                            </div>
+                                            <button onClick={()=>onDeleteTodo(t.id)} style={{opacity:0,fontSize:'16px',color:'#ef4444',background:'none',border:'none',cursor:'pointer',padding:'4px 8px',transition:'opacity 0.2s'}} onMouseEnter={e=>e.currentTarget.style.opacity='1'} onMouseLeave={e=>e.currentTarget.style.opacity='0'}>×</button>
+                                        </div>
+                                    ))}
+                                    {todayTodos.length===0&&<div style={{textAlign:'center',padding:'32px',fontSize:'11px',fontWeight:700,opacity:0.2,textTransform:'uppercase',letterSpacing:'0.1em'}}>오늘의 목표를 추가해보세요</div>}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* ── 오른쪽: 공부 그룹 ── */}
+                        <div style={{display:'flex', flexDirection:'column', gap:'12px'}}>
+                            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'4px'}}>
+                                <h4 style={{fontSize:'14px', fontWeight:900, color:'var(--text)'}}>👥 공부 그룹</h4>
+                            </div>
+
+                            {/* 그룹 액션 */}
+                            <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'8px'}}>
+                                <button onClick={()=>{setShowCreate(true);setShowJoin(false);}} className="btn-primary" style={{padding:'10px', fontSize:'11px', fontWeight:900}}>+ 만들기</button>
+                                <button onClick={()=>{setShowJoin(true);setShowCreate(false);}} style={{padding:'10px', borderRadius:'14px', border:'1.5px solid var(--glass-border)', background:'var(--glass-bg2)', cursor:'pointer', fontSize:'11px', fontWeight:900, color:'var(--text-sub)', fontFamily:'Pretendard,sans-serif'}}>코드 참여</button>
+                            </div>
+
+                            {showCreate && (
+                                <div className="glass-card" style={{padding:'16px'}}>
+                                    <p style={{fontSize:'9px',fontWeight:900,opacity:0.4,textTransform:'uppercase',letterSpacing:'0.15em',marginBottom:'10px',color:'var(--text)'}}>새 그룹 이름</p>
+                                    <input autoFocus value={newGroupName} onChange={e=>setNewGroupName(e.target.value)} onKeyDown={e=>e.key==='Enter'&&createGroup()} placeholder="그룹 이름" style={{width:'100%', marginBottom:'10px'}} />
+                                    <div style={{display:'flex', gap:'8px'}}>
+                                        <button onClick={()=>setShowCreate(false)} style={{flex:1,padding:'8px',borderRadius:'12px',border:'1.5px solid var(--glass-border)',background:'var(--glass-bg2)',cursor:'pointer',fontSize:'11px',fontWeight:800,color:'var(--text-sub)',fontFamily:'Pretendard,sans-serif'}}>취소</button>
+                                        <button onClick={createGroup} disabled={creating||!newGroupName.trim()} className="btn-primary" style={{flex:1,padding:'8px',fontSize:'11px',opacity:!newGroupName.trim()?0.4:1}}>{creating?'..':'만들기'}</button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {showJoin && (
+                                <div className="glass-card" style={{padding:'16px'}}>
+                                    <p style={{fontSize:'9px',fontWeight:900,opacity:0.4,textTransform:'uppercase',letterSpacing:'0.15em',marginBottom:'10px',color:'var(--text)'}}>참여 코드 (6자리)</p>
+                                    <input autoFocus value={joinCode} onChange={e=>setJoinCode(e.target.value.toUpperCase())} onKeyDown={e=>e.key==='Enter'&&joinGroup()} placeholder="XXXXXX" style={{width:'100%', marginBottom:'10px', fontFamily:'monospace', letterSpacing:'0.25em', textAlign:'center'}} />
+                                    <div style={{display:'flex', gap:'8px'}}>
+                                        <button onClick={()=>setShowJoin(false)} style={{flex:1,padding:'8px',borderRadius:'12px',border:'1.5px solid var(--glass-border)',background:'var(--glass-bg2)',cursor:'pointer',fontSize:'11px',fontWeight:800,color:'var(--text-sub)',fontFamily:'Pretendard,sans-serif'}}>취소</button>
+                                        <button onClick={joinGroup} disabled={joining||!joinCode.trim()} className="btn-primary" style={{flex:1,padding:'8px',fontSize:'11px',opacity:!joinCode.trim()?0.4:1}}>{joining?'..':'참여'}</button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {studyGroups.length === 0 ? (
+                                <div className="glass-card" style={{padding:'32px', textAlign:'center'}}>
+                                    <div style={{fontSize:'36px', marginBottom:'10px'}}>👥</div>
+                                    <div style={{fontSize:'11px', fontWeight:700, opacity:0.25, textTransform:'uppercase', letterSpacing:'0.1em'}}>참여한 그룹이 없습니다</div>
+                                </div>
+                            ) : studyGroups.map(group => {
+                                const presence = groupPresence[group.id] || {};
+                                const memberList = Object.entries(group.memberData || {});
+                                const studyingCount = memberList.filter(([uid]) => presence[uid]?.isStudying).length;
+                                return (
+                                    <div key={group.id} className="glass-card" style={{padding:'18px'}}>
+                                        <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:'4px'}}>
+                                            <div>
+                                                <div style={{fontSize:'14px', fontWeight:900, color:'var(--text)'}}>{group.name}</div>
+                                                <div style={{display:'flex', alignItems:'center', gap:'8px', marginTop:'4px'}}>
+                                                    <span style={{fontSize:'10px', fontWeight:800, color:'var(--accent)', fontFamily:'monospace', letterSpacing:'0.15em'}}>코드: {group.code}</span>
+                                                    {studyingCount > 0 && <span style={{fontSize:'10px', fontWeight:800, color:'#22c55e'}}>🟢 {studyingCount}명 공부 중</span>}
+                                                </div>
+                                            </div>
+                                            <button onClick={()=>onLeaveGroup(group.id)} style={{background:'none',border:'none',cursor:'pointer',fontSize:'10px',fontWeight:800,color:'var(--text-sub)',opacity:0.35,fontFamily:'Pretendard,sans-serif',padding:'0'}} onMouseEnter={e=>e.currentTarget.style.opacity='1'} onMouseLeave={e=>e.currentTarget.style.opacity='0.35'}>나가기</button>
+                                        </div>
+                                        <div style={{height:'1px', background:'var(--glass-border)', margin:'12px 0'}}></div>
+                                        <div style={{display:'flex', flexDirection:'column', gap:'6px'}}>
+                                            {memberList.map(([uid, member]) => {
+                                                const p = presence[uid];
+                                                const studying = p?.isStudying;
+                                                const sc = SUBJECTS.find(s => s.id === p?.subject);
+                                                const isMe = uid === currentUser?.uid;
+                                                return (
+                                                    <div key={uid} style={{display:'flex', alignItems:'center', gap:'10px', padding:'8px 10px', borderRadius:'12px', background:'var(--glass-bg2)', border: isMe ? '1px solid rgba(79,110,247,0.2)' : 'none'}}>
+                                                        <div style={{width:'8px', height:'8px', borderRadius:'50%', background:studying?'#22c55e':'var(--text-sub)', opacity:studying?1:0.2, flexShrink:0, boxShadow:studying?'0 0 8px #22c55e':'none', transition:'all 0.3s'}}></div>
+                                                        <div style={{flex:1, minWidth:0}}>
+                                                            <div style={{fontSize:'12px', fontWeight:800, color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{member.name || member.id}{isMe&&<span style={{fontSize:'9px',opacity:0.4,marginLeft:'5px'}}>나</span>}</div>
+                                                            {studying && p.subject && <div style={{fontSize:'10px', fontWeight:700, color:sc?.color||'var(--accent)', marginTop:'1px'}}>{p.subject} 공부 중</div>}
+                                                        </div>
+                                                        {(p?.todaySeconds > 0) && <span style={{fontSize:'10px', fontWeight:800, opacity:0.4, flexShrink:0}}>{Math.floor(p.todaySeconds/60)}분</span>}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    {/* ── 히트맵 ── */}
+                    <StudyHeatmap heatmapData={heatmapData} />
+                </div>
+            );
+        }
+
+        // ─── Dashboard ──────────────────────────────────────────────────────
+
+        function Dashboard({ announcements, todos, resources, posts, studyTime, suneungDate, getDDay, setView }) {
+            const todayCount = todos.filter(t => t.date === new Date().toISOString().split('T')[0]).length;
+            const stats = [
+                {l:'Active Tasks', v: todayCount,              u:'Goals', icon:'✅'},
+                {l:'Study Time',   v: Math.floor(studyTime/60),u:'Mins',  icon:'⏱️'},
+                {l:'D-Day',        v: getDDay(suneungDate),    u:'',      icon:'🎯'},
+                {l:'Resources',    v: resources.length,        u:'Files', icon:'📚'},
+            ];
+            return (
+                <div style={{display:'flex', flexDirection:'column', gap:'20px'}}>
+                    {/* 히어로 배너 */}
+                    <div className="hero-banner anim-fade-up">
+                        <div className="hero-blob" style={{width:'280px',height:'280px',top:'-80px',right:'-60px',animationDelay:'0s'}}></div>
+                        <div className="hero-blob" style={{width:'180px',height:'180px',bottom:'-60px',left:'10%',animationDelay:'3s'}}></div>
+                        <div style={{position:'relative', zIndex:1}}>
+                            <p style={{fontSize:'11px', fontWeight:800, textTransform:'uppercase', letterSpacing:'0.2em', opacity:0.7, marginBottom:'8px'}}>Welcome Back</p>
+                            <h3 style={{fontSize:'26px', fontWeight:900, letterSpacing:'-0.5px', marginBottom:'6px', lineHeight:1.2}}>
+                                오늘도 한 걸음, 수능까지 {getDDay(suneungDate)} 🌟
+                            </h3>
+                            <p style={{fontSize:'13px', opacity:0.65, fontWeight:600, marginBottom:'28px'}}>하이스트와 함께 오늘의 목표를 달성하세요.</p>
+                            <div style={{display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:'12px'}}>
+                                {stats.map((s,i) => (
+                                    <div key={i} className="stat-card" style={{animationDelay:`${i*0.08}s`}}>
+                                        <div style={{fontSize:'18px', marginBottom:'6px'}}>{s.icon}</div>
+                                        <div style={{fontSize:'9px', fontWeight:800, textTransform:'uppercase', letterSpacing:'0.15em', opacity:0.55, marginBottom:'4px'}}>{s.l}</div>
+                                        <div style={{fontSize:'24px', fontWeight:900, letterSpacing:'-0.5px'}}>{s.v}<span style={{fontSize:'10px', opacity:0.45, fontWeight:700, marginLeft:'3px'}}>{s.u}</span></div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 하단 카드 2열 */}
+                    <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'16px'}}>
+                        {/* 공지 */}
+                        <div className="glass-card anim-fade-up delay-1" style={{padding:'24px'}}>
+                            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'16px'}}>
+                                <h3 style={{fontSize:'14px', fontWeight:800, color:'var(--text)'}}>📢 공지사항</h3>
+                                <span style={{fontSize:'9px', fontWeight:800, opacity:0.3, textTransform:'uppercase', letterSpacing:'0.1em'}}>Latest 3</span>
+                            </div>
+                            <div style={{display:'flex', flexDirection:'column', gap:'8px'}}>
+                                {announcements.slice(0,3).map((a,i) => (
+                                    <div key={a.id} className="glass-inset" style={{padding:'12px 16px', animation:`fadeInUp 0.3s ease ${i*0.06}s both`}}>
+                                        <div style={{fontSize:'13px', fontWeight:800, color:'var(--text)', marginBottom:'3px'}}>{a.title}</div>
+                                        <div style={{fontSize:'9px', fontWeight:700, opacity:0.35, textTransform:'uppercase', letterSpacing:'0.1em'}}>{a.date}</div>
+                                    </div>
+                                ))}
+                                {announcements.length === 0 && (
+                                    <div style={{textAlign:'center', padding:'24px', fontSize:'11px', fontWeight:700, opacity:0.2, textTransform:'uppercase', letterSpacing:'0.1em'}}>등록된 공지가 없습니다</div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* 커뮤니티 트렌드 */}
+                        <div className="glass-card anim-fade-up delay-2" style={{padding:'24px'}}>
+                            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'16px'}}>
+                                <h3 style={{fontSize:'14px', fontWeight:800, color:'var(--text)'}}>🔥 Community</h3>
+                                <button onClick={()=>setView('커뮤니티')} style={{fontSize:'9px', fontWeight:800, opacity:0.45, textTransform:'uppercase', letterSpacing:'0.1em', background:'none', border:'none', cursor:'pointer', color:'var(--accent)', fontFamily:'Pretendard,sans-serif', transition:'opacity 0.2s'}} onMouseEnter={e=>e.currentTarget.style.opacity='1'} onMouseLeave={e=>e.currentTarget.style.opacity='0.45'}>더보기 →</button>
+                            </div>
+                            <div style={{display:'flex', flexDirection:'column', gap:'8px'}}>
+                                {posts.length > 0 ? posts.slice(0,3).map((p,i) => (
+                                    <div key={p.id} className="glass-inset" style={{padding:'12px 16px', display:'flex', alignItems:'center', gap:'12px', cursor:'pointer', transition:'all 0.2s', animation:`fadeInUp 0.3s ease ${i*0.06}s both`}}
+                                        onClick={()=>setView('커뮤니티')}
+                                        onMouseEnter={e=>{e.currentTarget.style.transform='translateX(4px)'}}
+                                        onMouseLeave={e=>{e.currentTarget.style.transform=''}}>
+                                        <div style={{width:'32px', height:'32px', borderRadius:'10px', background:'var(--glass-bg)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'13px', flexShrink:0, fontWeight:800, color:'var(--accent)'}}>
+                                            {p.category==='공부'?'📖':p.category==='질문'?'❓':p.category==='잡담'?'💬':'📝'}
+                                        </div>
+                                        <div style={{flex:1, minWidth:0}}>
+                                            <div style={{fontSize:'12px', fontWeight:800, color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{p.title}</div>
+                                            <div style={{fontSize:'10px', fontWeight:700, opacity:0.4, marginTop:'2px'}}>{p.authorName}</div>
+                                        </div>
+                                    </div>
+                                )) : (
+                                    [{icon:'👑', text:'커뮤니티에 첫 글을 남겨보세요!'},{icon:'⚡', text:'공부 팁, 질문, 자유롭게 공유하세요'},{icon:'📖', text:'함께라면 더 멀리 갈 수 있어요'}].map((item,i) => (
+                                        <div key={i} className="glass-inset" style={{padding:'12px 16px', display:'flex', alignItems:'center', gap:'12px', cursor:'pointer', transition:'all 0.2s', animation:`fadeInUp 0.3s ease ${i*0.06}s both`}}
+                                            onClick={()=>setView('커뮤니티')}
+                                            onMouseEnter={e=>{e.currentTarget.style.transform='translateX(4px)'}}
+                                            onMouseLeave={e=>{e.currentTarget.style.transform=''}}>
+                                            <div style={{width:'32px', height:'32px', borderRadius:'10px', background:'var(--glass-bg)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'14px', flexShrink:0}}>{item.icon}</div>
+                                            <div style={{fontSize:'12px', fontWeight:700, opacity:0.75}}>{item.text}</div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // ─── CommunityView ───────────────────────────────────────────────────
+
+        const CATEGORIES = ['전체','공부','질문','잡담','기타'];
+        const CAT_ICON   = { '공부':'📖', '질문':'❓', '잡담':'💬', '기타':'📝' };
+
+        function CommunityView({ posts, currentUser, onAddPost }) {
+            const [mode, setMode]                 = useState('list');   // 'list' | 'write' | 'detail'
+            const [selectedPost, setSelectedPost] = useState(null);
+            const [filterCat, setFilterCat]       = useState('전체');
+            const [submitting, setSubmitting]     = useState(false);
+
+            // write form state
+            const [wTitle,    setWTitle]   = useState('');
+            const [wContent,  setWContent] = useState('');
+            const [wCategory, setWCategory]= useState('공부');
+
+            // comment state
+            const [comments,      setComments]      = useState([]);
+            const [localComments, setLocalComments] = useState({});   // { [postId]: [...] } for local-admin
+            const [commentInput,  setCommentInput]  = useState('');
+            const [commentLoading, setCommentLoading] = useState(false);
+            const commentEndRef = useRef(null);
+
+            const isLocalAdmin = currentUser?.uid === 'local-admin';
+
+            // 댓글 로드: 상세 화면 진입 시 onSnapshot 구독 (로컬 어드민은 로컬 상태)
+            useEffect(() => {
+                if (mode !== 'detail' || !selectedPost) return;
+                if (isLocalAdmin) {
+                    setComments(localComments[selectedPost.id] || []);
+                    return;
+                }
+                const unsub = db.collection('posts').doc(selectedPost.id)
+                    .collection('comments')
+                    .orderBy('createdAt', 'asc')
+                    .onSnapshot(snap => {
+                        setComments(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+                    }, () => {});
+                return () => unsub();
+            }, [selectedPost?.id, mode]);
+
+            useEffect(() => {
+                commentEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+            }, [comments]);
+
+            const submitPost = async () => {
+                if (!wTitle.trim() || !wContent.trim()) return;
+                setSubmitting(true);
+                await onAddPost(wTitle.trim(), wContent.trim(), wCategory);
+                setSubmitting(false);
+                setWTitle(''); setWContent(''); setWCategory('공부');
+                setMode('list');
+            };
+
+            const submitComment = async () => {
+                if (!commentInput.trim() || commentLoading) return;
+                setCommentLoading(true);
+                const now = new Date();
+                const newComment = {
+                    id: String(Date.now()),
+                    authorId: currentUser.id,
+                    authorName: currentUser.name,
+                    content: commentInput.trim(),
+                    date: now.toLocaleDateString('ko-KR'),
+                    time: now.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
+                };
+                if (isLocalAdmin) {
+                    const updated = [...(localComments[selectedPost.id] || []), newComment];
+                    setLocalComments(prev => ({ ...prev, [selectedPost.id]: updated }));
+                    setComments(updated);
+                } else {
+                    await db.collection('posts').doc(selectedPost.id).collection('comments').add({
+                        authorId: currentUser.id,
+                        authorName: currentUser.name,
+                        content: commentInput.trim(),
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    }).catch(() => {});
+                    // onSnapshot이 자동으로 comments 업데이트
+                }
+                setCommentInput('');
+                setCommentLoading(false);
+            };
+
+            const openDetail = (post) => { setSelectedPost(post); setComments([]); setCommentInput(''); setMode('detail'); };
+
+            const filteredPosts = filterCat === '전체' ? posts : posts.filter(p => p.category === filterCat);
+
+            /* ── Detail ── */
+            if (mode === 'detail' && selectedPost) return (
+                <div className="anim-fade-up" style={{maxWidth:'760px', margin:'0 auto'}}>
+                    <button onClick={()=>setMode('list')} style={{background:'none', border:'none', cursor:'pointer', color:'var(--accent)', fontWeight:800, fontSize:'13px', fontFamily:'Pretendard,sans-serif', marginBottom:'16px', padding:'0', display:'flex', alignItems:'center', gap:'6px'}}>
+                        ← 목록으로
+                    </button>
+
+                    {/* 본문 */}
+                    <div className="glass-card-lg" style={{padding:'32px 36px', marginBottom:'16px'}}>
+                        <div style={{display:'flex', alignItems:'center', gap:'10px', marginBottom:'20px'}}>
+                            <span style={{padding:'4px 12px', borderRadius:'99px', background:'rgba(79,110,247,0.15)', border:'1px solid rgba(79,110,247,0.3)', fontSize:'11px', fontWeight:800, color:'var(--accent)'}}>
+                                {CAT_ICON[selectedPost.category] || '📝'} {selectedPost.category}
+                            </span>
+                        </div>
+                        <h2 style={{fontSize:'22px', fontWeight:900, color:'var(--text)', letterSpacing:'-0.3px', marginBottom:'12px', lineHeight:1.35}}>{selectedPost.title}</h2>
+                        <div style={{display:'flex', gap:'16px', marginBottom:'28px', paddingBottom:'20px', borderBottom:'1px solid var(--glass-border)'}}>
+                            <span style={{fontSize:'11px', fontWeight:700, opacity:0.45}}>{selectedPost.authorName}</span>
+                            <span style={{fontSize:'11px', fontWeight:700, opacity:0.35}}>{selectedPost.date} {selectedPost.time}</span>
+                        </div>
+                        <p style={{fontSize:'15px', fontWeight:600, lineHeight:1.8, color:'var(--text)', opacity:0.85, whiteSpace:'pre-wrap'}}>{selectedPost.content}</p>
+                    </div>
+
+                    {/* 댓글 섹션 */}
+                    <div className="glass-card" style={{padding:'24px 28px'}}>
+                        <h4 style={{fontSize:'14px', fontWeight:900, color:'var(--text)', marginBottom:'20px'}}>
+                            💬 댓글 <span style={{fontSize:'12px', fontWeight:700, opacity:0.35, marginLeft:'6px'}}>{comments.length}</span>
+                        </h4>
+
+                        {/* 댓글 목록 */}
+                        <div style={{display:'flex', flexDirection:'column', gap:'12px', marginBottom:'20px'}}>
+                            {comments.length === 0 && (
+                                <div style={{textAlign:'center', padding:'28px', fontSize:'11px', fontWeight:700, opacity:0.2, textTransform:'uppercase', letterSpacing:'0.12em'}}>첫 댓글을 남겨보세요</div>
+                            )}
+                            {comments.map((c, i) => {
+                                const isMine = c.authorId === currentUser.id;
+                                return (
+                                    <div key={c.id} className="glass-inset" style={{padding:'14px 18px', animation:`fadeInUp 0.25s ease ${i*0.04}s both`}}>
+                                        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'8px'}}>
+                                            <div style={{display:'flex', alignItems:'center', gap:'8px'}}>
+                                                <div style={{width:'26px', height:'26px', borderRadius:'8px', background:'linear-gradient(135deg, var(--accent), var(--accent2))', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'11px', flexShrink:0}}>
+                                                    {c.authorName?.[0] || '?'}
+                                                </div>
+                                                <span style={{fontSize:'12px', fontWeight:800, color: isMine ? 'var(--accent)' : 'var(--text)'}}>{c.authorName}{isMine && <span style={{fontSize:'9px', fontWeight:700, opacity:0.5, marginLeft:'5px'}}>나</span>}</span>
+                                            </div>
+                                            <span style={{fontSize:'10px', fontWeight:700, opacity:0.3}}>{c.time || ''}</span>
+                                        </div>
+                                        <p style={{fontSize:'13px', fontWeight:600, lineHeight:1.6, color:'var(--text)', opacity:0.8, margin:0, paddingLeft:'34px'}}>{c.content}</p>
+                                    </div>
+                                );
+                            })}
+                            <div ref={commentEndRef} />
+                        </div>
+
+                        {/* 댓글 입력 */}
+                        <div style={{display:'flex', gap:'10px', alignItems:'flex-end'}}>
+                            <textarea
+                                value={commentInput}
+                                onChange={e=>setCommentInput(e.target.value)}
+                                onKeyDown={e=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); submitComment(); } }}
+                                placeholder="댓글을 입력하세요… (Enter로 전송, Shift+Enter로 줄바꿈)"
+                                rows={2}
+                                style={{flex:1, resize:'none', fontSize:'13px', fontWeight:600, lineHeight:1.6, background:'var(--glass-bg2)', border:'1.5px solid var(--glass-border)', borderRadius:'14px', padding:'12px 16px', color:'var(--text)', fontFamily:'Pretendard,sans-serif', outline:'none'}}
+                                onFocus={e=>{e.target.style.borderColor='var(--accent)'; e.target.style.boxShadow='0 0 0 3px rgba(79,110,247,0.1)';}}
+                                onBlur={e=>{e.target.style.borderColor='var(--glass-border)'; e.target.style.boxShadow='none';}}
+                            />
+                            <button
+                                onClick={submitComment}
+                                disabled={commentLoading || !commentInput.trim()}
+                                className="btn-primary"
+                                style={{flexShrink:0, padding:'12px 20px', opacity: !commentInput.trim() ? 0.4 : 1, alignSelf:'flex-end'}}>
+                                {commentLoading ? '...' : '전송'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+
+            /* ── Write ── */
+            if (mode === 'write') return (
+                <div className="anim-fade-up" style={{maxWidth:'760px', margin:'0 auto'}}>
+                    <button onClick={()=>setMode('list')} style={{background:'none', border:'none', cursor:'pointer', color:'var(--accent)', fontWeight:800, fontSize:'13px', fontFamily:'Pretendard,sans-serif', marginBottom:'16px', padding:'0'}}>
+                        ← 취소
+                    </button>
+                    <div className="glass-card-lg" style={{padding:'32px 36px'}}>
+                        <h3 style={{fontSize:'18px', fontWeight:900, color:'var(--text)', marginBottom:'24px'}}>✏️ 새 글 작성</h3>
+
+                        {/* 카테고리 선택 */}
+                        <div style={{marginBottom:'20px'}}>
+                            <p style={{fontSize:'9px', fontWeight:900, opacity:0.35, textTransform:'uppercase', letterSpacing:'0.2em', marginBottom:'10px', color:'var(--text)'}}>Category</p>
+                            <div style={{display:'flex', gap:'8px', flexWrap:'wrap'}}>
+                                {CATEGORIES.filter(c=>c!=='전체').map(c => (
+                                    <button key={c} onClick={()=>setWCategory(c)}
+                                        style={{padding:'8px 18px', borderRadius:'99px', border: wCategory===c ? '2px solid var(--accent)' : '1.5px solid var(--glass-border)', background: wCategory===c ? 'rgba(79,110,247,0.15)' : 'var(--glass-bg2)', cursor:'pointer', fontSize:'12px', fontWeight:800, color: wCategory===c ? 'var(--accent)' : 'var(--text-sub)', fontFamily:'Pretendard,sans-serif', transition:'all 0.15s'}}>
+                                        {CAT_ICON[c]} {c}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* 제목 */}
+                        <div style={{marginBottom:'16px'}}>
+                            <p style={{fontSize:'9px', fontWeight:900, opacity:0.35, textTransform:'uppercase', letterSpacing:'0.2em', marginBottom:'8px', color:'var(--text)'}}>Title</p>
+                            <input
+                                value={wTitle} onChange={e=>setWTitle(e.target.value)}
+                                placeholder="제목을 입력하세요"
+                                style={{width:'100%', fontSize:'16px', fontWeight:800}}
+                            />
+                        </div>
+
+                        {/* 본문 */}
+                        <div style={{marginBottom:'24px'}}>
+                            <p style={{fontSize:'9px', fontWeight:900, opacity:0.35, textTransform:'uppercase', letterSpacing:'0.2em', marginBottom:'8px', color:'var(--text)'}}>Content</p>
+                            <textarea
+                                value={wContent} onChange={e=>setWContent(e.target.value)}
+                                placeholder="내용을 입력하세요..."
+                                rows={10}
+                                style={{width:'100%', resize:'vertical', fontSize:'14px', fontWeight:600, lineHeight:1.7, background:'var(--glass-bg2)', border:'1.5px solid var(--glass-border)', borderRadius:'16px', padding:'16px 18px', color:'var(--text)', fontFamily:'Pretendard,sans-serif', outline:'none'}}
+                                onFocus={e=>{e.target.style.borderColor='var(--accent)'; e.target.style.boxShadow='0 0 0 3px rgba(79,110,247,0.12)';}}
+                                onBlur={e=>{e.target.style.borderColor='var(--glass-border)'; e.target.style.boxShadow='none';}}
+                            />
+                        </div>
+
+                        <div style={{display:'flex', gap:'10px', justifyContent:'flex-end'}}>
+                            <button onClick={()=>setMode('list')} style={{padding:'12px 24px', borderRadius:'16px', border:'1.5px solid var(--glass-border)', background:'var(--glass-bg2)', cursor:'pointer', fontSize:'13px', fontWeight:800, color:'var(--text-sub)', fontFamily:'Pretendard,sans-serif'}}>취소</button>
+                            <button onClick={submitPost} disabled={submitting || !wTitle.trim() || !wContent.trim()} className="btn-primary" style={{padding:'12px 32px', opacity: (!wTitle.trim()||!wContent.trim()) ? 0.4 : 1}}>
+                                {submitting ? '게시 중...' : '게시하기'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+
+            /* ── List ── */
+            return (
+                <div className="anim-fade-up">
+                    {/* 헤더 */}
+                    <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'20px'}}>
+                        <div>
+                            <h3 style={{fontSize:'18px', fontWeight:900, color:'var(--text)', letterSpacing:'-0.3px'}}>🔥 커뮤니티</h3>
+                            <p style={{fontSize:'10px', fontWeight:700, opacity:0.3, textTransform:'uppercase', letterSpacing:'0.15em', marginTop:'3px'}}>{posts.length} Posts</p>
+                        </div>
+                        <button className="btn-primary" onClick={()=>setMode('write')}>+ 글 쓰기</button>
+                    </div>
+
+                    {/* 카테고리 필터 */}
+                    <div style={{display:'flex', gap:'8px', marginBottom:'20px', flexWrap:'wrap'}}>
+                        {CATEGORIES.map(c => (
+                            <button key={c} onClick={()=>setFilterCat(c)}
+                                style={{padding:'7px 16px', borderRadius:'99px', border: filterCat===c ? '2px solid var(--accent)' : '1.5px solid var(--glass-border)', background: filterCat===c ? 'rgba(79,110,247,0.15)' : 'var(--glass-bg2)', cursor:'pointer', fontSize:'11px', fontWeight:800, color: filterCat===c ? 'var(--accent)' : 'var(--text-sub)', fontFamily:'Pretendard,sans-serif', transition:'all 0.15s'}}>
+                                {c === '전체' ? '# 전체' : `${CAT_ICON[c]} ${c}`}
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* 게시글 목록 */}
+                    <div style={{display:'flex', flexDirection:'column', gap:'10px'}}>
+                        {filteredPosts.map((p,i) => (
+                            <div key={p.id} className="glass-card" onClick={()=>openDetail(p)}
+                                style={{padding:'20px 24px', cursor:'pointer', transition:'all 0.2s', animation:`fadeInUp 0.3s ease ${i*0.05}s both'`}}
+                                onMouseEnter={e=>{e.currentTarget.style.transform='translateY(-2px)'; e.currentTarget.style.boxShadow='0 8px 32px rgba(79,110,247,0.15)';}}
+                                onMouseLeave={e=>{e.currentTarget.style.transform=''; e.currentTarget.style.boxShadow='';}}>
+                                <div style={{display:'flex', alignItems:'flex-start', gap:'14px'}}>
+                                    <div style={{width:'40px', height:'40px', borderRadius:'14px', background:'rgba(79,110,247,0.1)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'18px', flexShrink:0}}>{CAT_ICON[p.category] || '📝'}</div>
+                                    <div style={{flex:1, minWidth:0}}>
+                                        <div style={{display:'flex', alignItems:'center', gap:'8px', marginBottom:'6px'}}>
+                                            <span style={{padding:'2px 10px', borderRadius:'99px', background:'rgba(79,110,247,0.1)', fontSize:'10px', fontWeight:800, color:'var(--accent)'}}>{p.category}</span>
+                                        </div>
+                                        <div style={{fontSize:'15px', fontWeight:800, color:'var(--text)', marginBottom:'6px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{p.title}</div>
+                                        <div style={{fontSize:'12px', fontWeight:600, opacity:0.5, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', lineHeight:1.5}}>{p.content}</div>
+                                        <div style={{display:'flex', gap:'12px', marginTop:'10px'}}>
+                                            <span style={{fontSize:'10px', fontWeight:700, opacity:0.4}}>{p.authorName}</span>
+                                            <span style={{fontSize:'10px', fontWeight:700, opacity:0.3}}>{p.date}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                        {filteredPosts.length === 0 && (
+                            <div style={{textAlign:'center', padding:'60px', fontSize:'12px', fontWeight:700, opacity:0.2, textTransform:'uppercase', letterSpacing:'0.15em'}}>
+                                {filterCat === '전체' ? '첫 글을 작성해보세요' : `${filterCat} 카테고리의 글이 없습니다`}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        // ─── NoticeView ──────────────────────────────────────────────────────
+
+        function NoticeView({ isAdmin, announcements, onAdd }) {
+            const [showForm, setShowForm] = useState(false);
+            const [title,   setTitle]    = useState('');
+            const [content, setContent]  = useState('');
+            const [loading, setLoading]  = useState(false);
+
+            const submit = async () => {
+                if (!title.trim() || !content.trim()) return;
+                setLoading(true);
+                await onAdd(title.trim(), content.trim());
+                setLoading(false);
+                setTitle(''); setContent(''); setShowForm(false);
+            };
+
+            return (
+                <div className="anim-fade-up">
+                    {/* 공지 작성 폼 */}
+                    {isAdmin && showForm && (
+                        <div className="glass-card" style={{padding:'24px 28px', marginBottom:'16px'}}>
+                            <h4 style={{fontSize:'14px', fontWeight:900, color:'var(--text)', marginBottom:'18px'}}>📢 공지 작성</h4>
+                            <div style={{display:'flex', flexDirection:'column', gap:'12px'}}>
+                                <input value={title} onChange={e=>setTitle(e.target.value)} placeholder="공지 제목" style={{fontSize:'15px', fontWeight:800}} />
+                                <textarea value={content} onChange={e=>setContent(e.target.value)} placeholder="공지 내용을 입력하세요..." rows={5}
+                                    style={{resize:'vertical', fontSize:'13px', fontWeight:600, lineHeight:1.7, background:'var(--glass-bg2)', border:'1.5px solid var(--glass-border)', borderRadius:'16px', padding:'14px 18px', color:'var(--text)', fontFamily:'Pretendard,sans-serif', outline:'none'}}
+                                    onFocus={e=>{e.target.style.borderColor='var(--accent)';}} onBlur={e=>{e.target.style.borderColor='var(--glass-border)';}} />
+                                <div style={{display:'flex', gap:'10px', justifyContent:'flex-end'}}>
+                                    <button onClick={()=>setShowForm(false)} style={{padding:'10px 20px', borderRadius:'14px', border:'1.5px solid var(--glass-border)', background:'var(--glass-bg2)', cursor:'pointer', fontSize:'12px', fontWeight:800, color:'var(--text-sub)', fontFamily:'Pretendard,sans-serif'}}>취소</button>
+                                    <button className="btn-primary" onClick={submit} disabled={loading || !title.trim() || !content.trim()} style={{padding:'10px 24px', opacity:(!title.trim()||!content.trim())?0.4:1}}>
+                                        {loading ? '등록 중...' : '공지 등록'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="glass-card-lg" style={{padding:'32px'}}>
+                        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'24px'}}>
+                            <h3 style={{fontSize:'18px', fontWeight:900, color:'var(--text)', letterSpacing:'-0.3px'}}>📢 공지사항</h3>
+                            {isAdmin && !showForm && (
+                                <button className="btn-primary" onClick={()=>setShowForm(true)}>+ 공지 등록</button>
+                            )}
+                        </div>
+                        <div style={{display:'flex', flexDirection:'column', gap:'12px'}}>
+                            {announcements.map((a,i) => (
+                                <div key={a.id} className="glass-inset" style={{padding:'20px 24px', animation:`fadeInUp 0.3s ease ${i*0.06}s both`, transition:'all 0.2s'}}
+                                    onMouseEnter={e=>{e.currentTarget.style.transform='translateY(-2px)'}}
+                                    onMouseLeave={e=>{e.currentTarget.style.transform=''}}>
+                                    <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:'8px'}}>
+                                        <h4 style={{fontSize:'15px', fontWeight:800, color:'var(--accent)'}}>{a.title}</h4>
+                                        <span style={{fontSize:'9px', fontWeight:700, opacity:0.3, textTransform:'uppercase', letterSpacing:'0.1em', flexShrink:0, marginLeft:'12px'}}>{a.date}</span>
+                                    </div>
+                                    <p style={{fontSize:'13px', fontWeight:600, opacity:0.65, lineHeight:1.6}}>{a.content}</p>
+                                </div>
+                            ))}
+                            {announcements.length === 0 && (
+                                <div style={{textAlign:'center', padding:'48px', fontSize:'12px', fontWeight:700, opacity:0.2, textTransform:'uppercase', letterSpacing:'0.15em'}}>등록된 공지가 없습니다</div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // ─── Planner ─────────────────────────────────────────────────────────
+
+        function Planner({ todos, selectedDate, setSelectedDate, onAdd, onToggle, onDelete }) {
+            const add = async (e) => {
+                if (e.key === 'Enter' && e.target.value.trim()) {
+                    await onAdd(e.target.value.trim(), selectedDate);
+                    e.target.value = '';
+                }
+            };
+            const filtered = todos.filter(t => t.date === selectedDate);
+            const done = filtered.filter(t => t.completed).length;
+            const progress = filtered.length ? Math.round(done/filtered.length*100) : 0;
+
+            return (
+                <div style={{maxWidth:'720px', margin:'0 auto'}} className="anim-fade-up">
+                    {/* 헤더 */}
+                    <div className="glass-card" style={{padding:'24px 28px', marginBottom:'16px', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                        <div>
+                            <h3 style={{fontSize:'18px', fontWeight:900, color:'var(--text)', marginBottom:'4px'}}>📅 데일리 플래너</h3>
+                            <div style={{fontSize:'11px', fontWeight:700, color:'var(--text-sub)'}}>
+                                {filtered.length > 0 ? `${done}/${filtered.length} 완료 · ${progress}%` : '오늘의 목표를 추가해보세요'}
+                            </div>
+                        </div>
+                        <input type="date" value={selectedDate} onChange={e=>setSelectedDate(e.target.value)} />
+                    </div>
+
+                    {/* 프로그레스 바 */}
+                    {filtered.length > 0 && (
+                        <div style={{height:'4px', background:'var(--glass-bg2)', borderRadius:'99px', marginBottom:'16px', overflow:'hidden'}}>
+                            <div style={{height:'100%', width:`${progress}%`, background:'linear-gradient(90deg, var(--accent), var(--accent2))', borderRadius:'99px', transition:'width 0.5s ease'}}></div>
+                        </div>
+                    )}
+
+                    {/* 입력 */}
+                    <div style={{position:'relative', marginBottom:'16px'}}>
+                        <input
+                            style={{paddingRight:'48px', fontSize:'15px', fontWeight:700}}
+                            placeholder="⏎  새 목표 입력 후 Enter"
+                            onKeyDown={add}
+                        />
+                    </div>
+
+                    {/* 투두 리스트 */}
+                    <div style={{display:'flex', flexDirection:'column', gap:'8px'}}>
+                        {filtered.map((t,i) => (
+                            <div key={t.id} className="todo-item" style={{animationDelay:`${i*0.05}s`}}>
+                                <div style={{display:'flex', alignItems:'center', gap:'14px', flex:1}}>
+                                    <div
+                                        onClick={() => onToggle(t.id)}
+                                        style={{width:'24px', height:'24px', borderRadius:'8px', flexShrink:0, cursor:'pointer', transition:'all 0.2s', border: t.completed ? 'none' : '2px solid var(--glass-border)', background: t.completed ? 'var(--accent)' : 'transparent', display:'flex', alignItems:'center', justifyContent:'center', boxShadow: t.completed ? '0 2px 8px rgba(79,110,247,0.35)' : 'none'}}>
+                                        {t.completed && <span style={{color:'#fff', fontSize:'12px', fontWeight:900}}>✓</span>}
+                                    </div>
+                                    <span style={{fontSize:'14px', fontWeight:700, color:'var(--text)', textDecoration: t.completed ? 'line-through' : 'none', opacity: t.completed ? 0.3 : 1, transition:'all 0.2s'}}>{t.text}</span>
+                                </div>
+                                <button
+                                    onClick={() => onDelete(t.id)}
+                                    style={{opacity:0, fontSize:'18px', color:'#ef4444', background:'none', border:'none', cursor:'pointer', padding:'4px 8px', transition:'opacity 0.2s'}}
+                                    onMouseEnter={e=>e.currentTarget.style.opacity='1'}
+                                    onMouseLeave={e=>e.currentTarget.style.opacity='0'}>×</button>
+                            </div>
+                        ))}
+                        {filtered.length === 0 && (
+                            <div style={{textAlign:'center', padding:'48px', fontSize:'12px', fontWeight:700, opacity:0.2, textTransform:'uppercase', letterSpacing:'0.15em'}}>이 날은 아직 계획이 없어요</div>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        // ─── CalendarView ────────────────────────────────────────────────────
+
+        function CalendarView({ isAdmin, sharedEvents, onAddEvent, onDeleteEvent }) {
+            const now = new Date();
+            const year = now.getFullYear(); const month = now.getMonth();
+            const days = useMemo(() => {
+                const first = new Date(year, month, 1).getDay();
+                const last  = new Date(year, month + 1, 0).getDate();
+                const arr = [];
+                for (let i = 0; i < first; i++) arr.push(null);
+                for (let i = 1; i <= last; i++) arr.push(i);
+                return arr;
+            }, [year, month]);
+
+            const [addingDay, setAddingDay] = useState(null);
+            const [eventText, setEventText] = useState('');
+            const [saving, setSaving]       = useState(false);
+
+            const clickDay = (day) => {
+                if (!isAdmin || !day) return;
+                setAddingDay(day); setEventText('');
+            };
+            const confirmEvent = async () => {
+                if (!eventText.trim()) return;
+                setSaving(true);
+                await onAddEvent(addingDay, eventText.trim());
+                setSaving(false); setAddingDay(null); setEventText('');
+            };
+
+            const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+            return (
+                <div className="anim-fade-up">
+                    <div className="glass-card-lg" style={{padding:'28px 32px'}}>
+                        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'20px'}}>
+                            <div>
+                                <h3 style={{fontSize:'18px', fontWeight:900, color:'var(--text)'}}>🗓️ 공용 달력</h3>
+                                <p style={{fontSize:'10px', fontWeight:700, opacity:0.35, textTransform:'uppercase', letterSpacing:'0.15em', marginTop:'2px'}}>{MONTHS[month]} {year}</p>
+                            </div>
+                            {isAdmin && <span style={{fontSize:'10px', fontWeight:800, opacity:0.4, color:'var(--accent)'}}>날짜를 클릭해 일정 추가</span>}
+                        </div>
+
+                        {/* 요일 헤더 */}
+                        <div style={{display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:'6px', marginBottom:'8px'}}>
+                            {['일','월','화','수','목','금','토'].map((d,i) => (
+                                <div key={d} style={{textAlign:'center', fontSize:'10px', fontWeight:800, opacity:0.3, padding:'4px 0', color: i===0?'#ef4444': i===6?'#60a5fa':'var(--text-sub)'}}>{d}</div>
+                            ))}
+                        </div>
+
+                        {/* 날짜 그리드 */}
+                        <div style={{display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:'6px'}}>
+                            {days.map((d, i) => {
+                                const isToday = d === now.getDate();
+                                const events = d ? sharedEvents.filter(e => e.day === d && e.month === month && e.year === year) : [];
+                                return (
+                                    <div
+                                        key={i}
+                                        className={d ? 'cal-cell' : ''}
+                                        style={{
+                                            minHeight:'80px', cursor: d&&isAdmin ? 'pointer' : d ? 'default' : 'default',
+                                            opacity: d ? 1 : 0,
+                                            border: isToday ? '2px solid var(--accent)' : undefined,
+                                            background: isToday ? 'rgba(79,110,247,0.08)' : undefined,
+                                        }}
+                                        onClick={() => clickDay(d)}>
+                                        {d && <>
+                                            <div style={{fontSize:'12px', fontWeight: isToday ? 900 : 700, color: isToday ? 'var(--accent)' : 'var(--text)', opacity: isToday ? 1 : 0.6, marginBottom:'4px'}}>{d}</div>
+                                            <div style={{display:'flex', flexDirection:'column', gap:'3px'}}>
+                                                {events.map((e, idx) => (
+                                                    <div key={idx}
+                                                        onClick={ev=>ev.stopPropagation()}
+                                                        style={{display:'flex', alignItems:'center', gap:'3px', padding:'2px 5px 2px 6px', borderRadius:'6px', fontSize:'8px', fontWeight:800, color:'#fff', background:'var(--accent)', overflow:'hidden', minWidth:0}}>
+                                                        <span style={{overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', flex:1}}>{e.text}</span>
+                                                        {isAdmin && (
+                                                            <span onClick={()=>onDeleteEvent(e.id)}
+                                                                style={{flexShrink:0, cursor:'pointer', opacity:0.6, fontSize:'10px', lineHeight:1, marginLeft:'2px'}}
+                                                                onMouseEnter={ev=>ev.currentTarget.style.opacity='1'}
+                                                                onMouseLeave={ev=>ev.currentTarget.style.opacity='0.6'}>×</span>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </>}
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        {/* 일정 추가 입력 (관리자가 날짜 클릭 시 표시) */}
+                        {addingDay && (
+                            <div className="glass-inset" style={{marginTop:'20px', padding:'14px 20px', display:'flex', alignItems:'center', gap:'12px', animation:'fadeInUp 0.2s ease both'}}>
+                                <span style={{fontSize:'13px', fontWeight:900, color:'var(--accent)', flexShrink:0, minWidth:'48px'}}>{addingDay}일</span>
+                                <input
+                                    autoFocus
+                                    value={eventText} onChange={e=>setEventText(e.target.value)}
+                                    onKeyDown={e=>{ if(e.key==='Enter') confirmEvent(); if(e.key==='Escape') setAddingDay(null); }}
+                                    placeholder="일정을 입력하세요 (Enter로 추가)"
+                                    style={{flex:1, fontSize:'13px', fontWeight:700}}
+                                />
+                                <button className="btn-primary" onClick={confirmEvent} disabled={saving || !eventText.trim()} style={{flexShrink:0, padding:'10px 18px', opacity:!eventText.trim()?0.4:1}}>
+                                    {saving ? '...' : '추가'}
+                                </button>
+                                <button onClick={()=>setAddingDay(null)} style={{background:'none', border:'none', cursor:'pointer', fontSize:'18px', color:'var(--text-sub)', opacity:0.4, lineHeight:1}}>×</button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        // ─── ResourceView ────────────────────────────────────────────────────
+
+        const RESOURCE_SUBJECTS = [
+            '언매','화작','심화국어','영어회화','영독작','영어권문화',
+            '미적분','경제수학','심화수학I',
+            '물리학II','화학II','생명과학II','지구과학II',
+            '물리 실험','생명과학 실험','지구과학 실험','과학과제연구',
+            '윤리와사상','정치와법','사회문제탐구','교육학','체육탐구',
+            '음악감상과 비평','미술창작','연극',
+            '인공지능 기초','프로그래밍','논술','일본어II','중국문화',
+        ];
+
+        function SubjectPicker({ value, onChange }) {
+            const [open, setOpen]   = useState(false);
+            const [query, setQuery] = useState('');
+            const ref = useRef(null);
+            useEffect(() => {
+                if (!open) return;
+                const h = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+                document.addEventListener('mousedown', h);
+                return () => document.removeEventListener('mousedown', h);
+            }, [open]);
+            const filtered = RESOURCE_SUBJECTS.filter(s => s.includes(query));
+            return (
+                <div style={{position:'relative'}} ref={ref}>
+                    <button onClick={()=>{ setOpen(o=>!o); setQuery(''); }}
+                        style={{display:'flex', alignItems:'center', justifyContent:'space-between', gap:'8px',
+                            width:'100%', height:'46px', padding:'0 14px',
+                            background:'var(--glass-bg2)', border:'1.5px solid var(--glass-border)',
+                            borderRadius:'12px', color:'var(--text)', fontSize:'13px', fontWeight:700,
+                            cursor:'pointer', fontFamily:'Pretendard,sans-serif'}}>
+                        <span>{value}</span>
+                        <span style={{opacity:0.4, fontSize:'10px'}}>{open ? '▲' : '▼'}</span>
+                    </button>
+                    {open && (
+                        <div style={{position:'absolute', top:'calc(100% + 6px)', left:0, zIndex:300,
+                            background:'var(--glass-bg)', backdropFilter:'blur(32px) saturate(180%)',
+                            border:'1px solid var(--glass-border)',
+                            borderRadius:'16px', padding:'10px', width:'240px',
+                            boxShadow:'0 16px 40px rgba(0,0,0,0.25)'}}>
+                            <input value={query} onChange={e=>setQuery(e.target.value)}
+                                placeholder="과목 검색..."
+                                style={{width:'100%', background:'var(--glass-bg2)', border:'1px solid var(--glass-border)',
+                                    borderRadius:'8px', color:'var(--text)', fontSize:'12px',
+                                    padding:'7px 10px', marginBottom:'8px', boxSizing:'border-box'}} />
+                            <div style={{maxHeight:'220px', overflowY:'auto', display:'flex', flexWrap:'wrap', gap:'5px'}}>
+                                {filtered.map(s => (
+                                    <button key={s} onClick={()=>{ onChange(s); setOpen(false); setQuery(''); }}
+                                        style={{padding:'5px 10px', borderRadius:'8px', fontSize:'12px', fontWeight:700,
+                                            border: value===s ? '1px solid var(--accent)' : '1px solid var(--glass-border)',
+                                            background: value===s ? 'rgba(79,110,247,0.15)' : 'var(--glass-bg2)',
+                                            color: value===s ? 'var(--accent)' : 'var(--text)',
+                                            cursor:'pointer', fontFamily:'Pretendard,sans-serif', whiteSpace:'nowrap'}}>
+                                        {s}
+                                    </button>
+                                ))}
+                                {filtered.length === 0 && <span style={{fontSize:'11px', opacity:0.3, padding:'4px', color:'var(--text)'}}>결과 없음</span>}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        function ResourceView({ resources, currentUser, onAdd }) {
+            const [mode,     setMode]     = useState('list');   // 'list' | 'write' | 'detail'
+            const [selected, setSelected] = useState(null);
+            const [filterSub, setFilterSub] = useState('전체');
+            const [submitting, setSubmitting] = useState(false);
+
+            // write state
+            const [wTitle,   setWTitle]   = useState('');
+            const [wSubject, setWSubject] = useState(RESOURCE_SUBJECTS[0]);
+            const [wDesc,    setWDesc]    = useState('');
+            const [wFiles,   setWFiles]   = useState([]);       // File[]
+            const fileRef = useRef(null);
+
+            const submit = async () => {
+                if (!wTitle.trim()) return;
+                setSubmitting(true);
+                try {
+                    await onAdd(wTitle.trim(), wSubject, wDesc.trim(), wFiles);
+                    setWTitle(''); setWDesc(''); setWFiles([]);
+                    if (fileRef.current) fileRef.current.value = '';
+                    setMode('list');
+                } finally { setSubmitting(false); }
+            };
+
+            const openDetail = (r) => { setSelected(r); setMode('detail'); };
+
+            const allSubjects = ['전체', ...RESOURCE_SUBJECTS.filter(s => resources.some(r => r.subject === s))];
+            const filtered = filterSub === '전체' ? resources : resources.filter(r => r.subject === filterSub);
+
+            /* ── Detail ── */
+            if (mode === 'detail' && selected) return (
+                <div className="anim-fade-up" style={{maxWidth:'760px', margin:'0 auto'}}>
+                    <button onClick={()=>setMode('list')}
+                        style={{background:'none', border:'none', cursor:'pointer', color:'var(--accent)', fontWeight:800, fontSize:'13px', fontFamily:'Pretendard,sans-serif', marginBottom:'16px', padding:'0'}}>
+                        ← 목록으로
+                    </button>
+                    <div className="glass-card-lg" style={{padding:'32px 36px'}}>
+                        {/* 헤더 */}
+                        <div style={{display:'flex', alignItems:'center', gap:'10px', marginBottom:'20px'}}>
+                            <span style={{padding:'4px 12px', borderRadius:'99px', background:'rgba(79,110,247,0.15)', border:'1px solid rgba(79,110,247,0.3)', fontSize:'11px', fontWeight:800, color:'var(--accent)'}}>
+                                📚 {selected.subject}
+                            </span>
+                        </div>
+                        <h2 style={{fontSize:'22px', fontWeight:900, color:'var(--text)', letterSpacing:'-0.3px', marginBottom:'12px', lineHeight:1.35}}>{selected.title}</h2>
+                        <div style={{display:'flex', gap:'16px', marginBottom:'24px', paddingBottom:'20px', borderBottom:'1px solid var(--glass-border)'}}>
+                            <span style={{fontSize:'11px', fontWeight:700, opacity:0.45}}>{selected.authorName}</span>
+                            <span style={{fontSize:'11px', fontWeight:700, opacity:0.35}}>{selected.date} {selected.time}</span>
+                        </div>
+
+                        {/* 설명 */}
+                        {selected.description && (
+                            <p style={{fontSize:'15px', fontWeight:600, lineHeight:1.8, color:'var(--text)', opacity:0.85, whiteSpace:'pre-wrap', marginBottom:'28px'}}>{selected.description}</p>
+                        )}
+
+                        {/* 첨부 파일 목록 */}
+                        <div>
+                            <p style={{fontSize:'9px', fontWeight:900, opacity:0.35, textTransform:'uppercase', letterSpacing:'0.2em', marginBottom:'12px', color:'var(--text)'}}>
+                                첨부 파일 {(selected.files||[]).length}개
+                            </p>
+                            {(selected.files||[]).length === 0 && (
+                                <p style={{fontSize:'12px', fontWeight:700, opacity:0.25}}>첨부된 파일이 없습니다.</p>
+                            )}
+                            <div style={{display:'flex', flexDirection:'column', gap:'8px'}}>
+                                {(selected.files||[]).map((f,i) => (
+                                    <div key={i} style={{display:'flex', alignItems:'center', justifyContent:'space-between',
+                                        padding:'12px 16px', borderRadius:'14px',
+                                        background:'var(--glass-bg2)', border:'1px solid var(--glass-border)'}}>
+                                        <div style={{display:'flex', alignItems:'center', gap:'10px'}}>
+                                            <span style={{fontSize:'18px'}}>📄</span>
+                                            <span style={{fontSize:'13px', fontWeight:700, color:'var(--text)'}}>{f.fileName}</span>
+                                        </div>
+                                        {f.downloadURL
+                                            ? <a href={f.downloadURL} target="_blank" rel="noreferrer" download={f.fileName}
+                                                style={{padding:'7px 16px', borderRadius:'10px', background:'var(--accent)',
+                                                    color:'#fff', fontSize:'12px', fontWeight:800, textDecoration:'none',
+                                                    flexShrink:0}}>
+                                                ⬇ 다운로드
+                                              </a>
+                                            : <span style={{fontSize:'11px', fontWeight:700, opacity:0.3}}>미리보기 불가</span>
+                                        }
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+
+            /* ── Write ── */
+            if (mode === 'write') return (
+                <div className="anim-fade-up" style={{maxWidth:'760px', margin:'0 auto'}}>
+                    <button onClick={()=>setMode('list')}
+                        style={{background:'none', border:'none', cursor:'pointer', color:'var(--accent)', fontWeight:800, fontSize:'13px', fontFamily:'Pretendard,sans-serif', marginBottom:'16px', padding:'0'}}>
+                        ← 취소
+                    </button>
+                    <div className="glass-card-lg" style={{padding:'32px 36px'}}>
+                        <h3 style={{fontSize:'18px', fontWeight:900, color:'var(--text)', marginBottom:'24px'}}>📤 자료 게시</h3>
+
+                        {/* 과목 선택 */}
+                        <div style={{marginBottom:'20px'}}>
+                            <p style={{fontSize:'9px', fontWeight:900, opacity:0.35, textTransform:'uppercase', letterSpacing:'0.2em', marginBottom:'8px', color:'var(--text)'}}>Subject</p>
+                            <SubjectPicker value={wSubject} onChange={setWSubject} />
+                        </div>
+
+                        {/* 제목 */}
+                        <div style={{marginBottom:'16px'}}>
+                            <p style={{fontSize:'9px', fontWeight:900, opacity:0.35, textTransform:'uppercase', letterSpacing:'0.2em', marginBottom:'8px', color:'var(--text)'}}>Title</p>
+                            <input value={wTitle} onChange={e=>setWTitle(e.target.value)}
+                                placeholder="게시물 제목"
+                                style={{width:'100%', fontSize:'16px', fontWeight:800}} />
+                        </div>
+
+                        {/* 설명 */}
+                        <div style={{marginBottom:'20px'}}>
+                            <p style={{fontSize:'9px', fontWeight:900, opacity:0.35, textTransform:'uppercase', letterSpacing:'0.2em', marginBottom:'8px', color:'var(--text)'}}>Description</p>
+                            <textarea value={wDesc} onChange={e=>setWDesc(e.target.value)}
+                                placeholder="자료에 대한 설명을 입력하세요... (선택)"
+                                rows={5}
+                                style={{width:'100%', resize:'vertical', fontSize:'14px', fontWeight:600, lineHeight:1.7,
+                                    background:'var(--glass-bg2)', border:'1.5px solid var(--glass-border)',
+                                    borderRadius:'16px', padding:'16px 18px', color:'var(--text)',
+                                    fontFamily:'Pretendard,sans-serif', outline:'none'}}
+                                onFocus={e=>{e.target.style.borderColor='var(--accent)'; e.target.style.boxShadow='0 0 0 3px rgba(79,110,247,0.12)';}}
+                                onBlur={e=>{e.target.style.borderColor='var(--glass-border)'; e.target.style.boxShadow='none';}}
+                            />
+                        </div>
+
+                        {/* 파일 첨부 (다중) */}
+                        <div style={{marginBottom:'28px'}}>
+                            <p style={{fontSize:'9px', fontWeight:900, opacity:0.35, textTransform:'uppercase', letterSpacing:'0.2em', marginBottom:'8px', color:'var(--text)'}}>Files</p>
+                            <label style={{display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:'8px',
+                                padding:'28px', borderRadius:'16px', border:'2px dashed var(--glass-border)',
+                                background:'var(--glass-bg2)', cursor:'pointer', transition:'all 0.15s'}}
+                                onMouseEnter={e=>{e.currentTarget.style.borderColor='var(--accent)'; e.currentTarget.style.background='rgba(79,110,247,0.06)';}}
+                                onMouseLeave={e=>{e.currentTarget.style.borderColor='var(--glass-border)'; e.currentTarget.style.background='var(--glass-bg2)';}}>
+                                <input type="file" multiple ref={fileRef}
+                                    style={{display:'none'}}
+                                    onChange={e=>setWFiles(Array.from(e.target.files||[]))} />
+                                <span style={{fontSize:'28px'}}>📁</span>
+                                <span style={{fontSize:'12px', fontWeight:700, color:'var(--text-sub)', opacity:0.6}}>
+                                    {wFiles.length > 0 ? `${wFiles.length}개 파일 선택됨` : '클릭하여 파일 선택 (여러 개 가능)'}
+                                </span>
+                            </label>
+                            {wFiles.length > 0 && (
+                                <div style={{marginTop:'10px', display:'flex', flexDirection:'column', gap:'6px'}}>
+                                    {wFiles.map((f,i) => (
+                                        <div key={i} style={{display:'flex', alignItems:'center', justifyContent:'space-between',
+                                            padding:'8px 14px', borderRadius:'10px',
+                                            background:'var(--glass-bg2)', border:'1px solid var(--glass-border)', fontSize:'12px', fontWeight:700, color:'var(--text)'}}>
+                                            <span>📄 {f.name}</span>
+                                            <button onClick={()=>setWFiles(prev=>prev.filter((_,j)=>j!==i))}
+                                                style={{background:'none', border:'none', cursor:'pointer', color:'var(--text-sub)', opacity:0.4, fontSize:'14px', fontFamily:'Pretendard,sans-serif'}}>×</button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        <div style={{display:'flex', gap:'10px', justifyContent:'flex-end'}}>
+                            <button onClick={()=>setMode('list')}
+                                style={{padding:'12px 24px', borderRadius:'16px', border:'1.5px solid var(--glass-border)', background:'var(--glass-bg2)', cursor:'pointer', fontSize:'13px', fontWeight:800, color:'var(--text-sub)', fontFamily:'Pretendard,sans-serif'}}>
+                                취소
+                            </button>
+                            <button onClick={submit} disabled={submitting || !wTitle.trim()} className="btn-primary"
+                                style={{padding:'12px 32px', opacity: !wTitle.trim() ? 0.4 : 1}}>
+                                {submitting ? '업로드 중...' : '게시하기'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+
+            /* ── List ── */
+            return (
+                <div className="anim-fade-up">
+                    {/* 헤더 */}
+                    <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'20px'}}>
+                        <div>
+                            <h3 style={{fontSize:'18px', fontWeight:900, color:'var(--text)', letterSpacing:'-0.3px'}}>📚 학습 자료실</h3>
+                            <p style={{fontSize:'10px', fontWeight:700, opacity:0.3, textTransform:'uppercase', letterSpacing:'0.15em', marginTop:'3px'}}>{resources.length} Posts</p>
+                        </div>
+                        <button className="btn-primary" onClick={()=>setMode('write')}>+ 자료 올리기</button>
+                    </div>
+
+                    {/* 과목 필터 */}
+                    <div style={{display:'flex', gap:'7px', marginBottom:'20px', flexWrap:'wrap'}}>
+                        {allSubjects.map(s => (
+                            <button key={s} onClick={()=>setFilterSub(s)}
+                                style={{padding:'6px 14px', borderRadius:'99px',
+                                    border: filterSub===s ? '2px solid var(--accent)' : '1.5px solid var(--glass-border)',
+                                    background: filterSub===s ? 'rgba(79,110,247,0.15)' : 'var(--glass-bg2)',
+                                    cursor:'pointer', fontSize:'11px', fontWeight:800,
+                                    color: filterSub===s ? 'var(--accent)' : 'var(--text-sub)',
+                                    fontFamily:'Pretendard,sans-serif', transition:'all 0.15s'}}>
+                                {s}
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* 게시물 목록 */}
+                    <div style={{display:'flex', flexDirection:'column', gap:'10px'}}>
+                        {filtered.map((r,i) => (
+                            <div key={r.id} className="glass-card" onClick={()=>openDetail(r)}
+                                style={{padding:'20px 24px', cursor:'pointer', transition:'all 0.2s', animation:`fadeInUp 0.3s ease ${i*0.05}s both`}}
+                                onMouseEnter={e=>{e.currentTarget.style.transform='translateY(-2px)'; e.currentTarget.style.boxShadow='0 8px 32px rgba(79,110,247,0.15)';}}
+                                onMouseLeave={e=>{e.currentTarget.style.transform=''; e.currentTarget.style.boxShadow='';}}>
+                                <div style={{display:'flex', alignItems:'flex-start', gap:'14px'}}>
+                                    <div style={{width:'42px', height:'42px', borderRadius:'14px', background:'rgba(79,110,247,0.1)',
+                                        display:'flex', alignItems:'center', justifyContent:'center', fontSize:'20px', flexShrink:0}}>
+                                        📄
+                                    </div>
+                                    <div style={{flex:1, minWidth:0}}>
+                                        <div style={{display:'flex', alignItems:'center', gap:'8px', marginBottom:'6px'}}>
+                                            <span style={{padding:'2px 10px', borderRadius:'99px', background:'rgba(79,110,247,0.1)',
+                                                fontSize:'10px', fontWeight:800, color:'var(--accent)'}}>
+                                                {r.subject}
+                                            </span>
+                                            {(r.fileCount > 0) && (
+                                                <span style={{padding:'2px 10px', borderRadius:'99px', background:'rgba(255,255,255,0.06)',
+                                                    fontSize:'10px', fontWeight:800, color:'var(--text-sub)', opacity:0.7}}>
+                                                    📎 {r.fileCount}개
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div style={{fontSize:'15px', fontWeight:800, color:'var(--text)', marginBottom:'5px',
+                                            overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>
+                                            {r.title}
+                                        </div>
+                                        {r.description && (
+                                            <div style={{fontSize:'12px', fontWeight:600, opacity:0.5, overflow:'hidden',
+                                                textOverflow:'ellipsis', whiteSpace:'nowrap', lineHeight:1.5}}>
+                                                {r.description}
+                                            </div>
+                                        )}
+                                        <div style={{display:'flex', gap:'12px', marginTop:'10px'}}>
+                                            <span style={{fontSize:'10px', fontWeight:700, opacity:0.4}}>{r.authorName}</span>
+                                            <span style={{fontSize:'10px', fontWeight:700, opacity:0.3}}>{r.date}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                        {filtered.length === 0 && (
+                            <div style={{textAlign:'center', padding:'64px', fontSize:'12px', fontWeight:700, opacity:0.2, textTransform:'uppercase', letterSpacing:'0.15em'}}>
+                                {filterSub === '전체' ? '공유된 자료가 없습니다' : `${filterSub} 자료가 없습니다`}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        // ─── MessageView ─────────────────────────────────────────────────────
+
+        function MessageView({ rooms, currentUser, localRoomMessages, onCreateRoom, onSendInRoom }) {
+            const [activeRoom,     setActiveRoom]     = useState(null);
+            const [roomMessages,   setRoomMessages]   = useState([]);
+            const [msgInput,       setMsgInput]       = useState('');
+            const [sending,        setSending]        = useState(false);
+            const [showCreate,     setShowCreate]     = useState(false);
+            const [createIds,      setCreateIds]      = useState('');
+            const [createName,     setCreateName]     = useState('');
+            const [creating,       setCreating]       = useState(false);
+            const [roomSearch,     setRoomSearch]     = useState('');
+            const msgEndRef = useRef(null);
+            const inputRef  = useRef(null);
+
+            const isLocalAdmin = currentUser?.uid === 'local-admin';
+
+            // 방 입장 시 메시지 구독
+            useEffect(() => {
+                if (!activeRoom) return;
+                if (isLocalAdmin) {
+                    setRoomMessages(localRoomMessages[activeRoom.id] || []);
+                    return;
+                }
+                const unsub = db.collection('rooms').doc(activeRoom.id)
+                    .collection('messages').orderBy('createdAt', 'asc')
+                    .onSnapshot(snap => setRoomMessages(snap.docs.map(d => ({ id: d.id, ...d.data() }))), () => {});
+                return () => unsub();
+            }, [activeRoom?.id]);
+
+            // 로컬 어드민: localRoomMessages 변경 반영
+            useEffect(() => {
+                if (isLocalAdmin && activeRoom) setRoomMessages(localRoomMessages[activeRoom.id] || []);
+            }, [localRoomMessages, activeRoom?.id]);
+
+            useEffect(() => { msgEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [roomMessages]);
+
+            // 방 선택 시 입력창 포커스
+            useEffect(() => { if (activeRoom) setTimeout(() => inputRef.current?.focus(), 50); }, [activeRoom?.id]);
+
+            const sendMsg = async () => {
+                if (!msgInput.trim() || !activeRoom || sending) return;
+                setSending(true);
+                await onSendInRoom(activeRoom.id, msgInput.trim());
+                setMsgInput('');
+                setSending(false);
+            };
+
+            const createRoom = async () => {
+                if (!createIds.trim() || creating) return;
+                setCreating(true);
+                const roomId = await onCreateRoom(createIds, createName);
+                setCreating(false);
+                if (roomId) {
+                    const found = rooms.find(r => r.id === roomId);
+                    setActiveRoom(found || { id: roomId, name: createIds, memberIds: [currentUser.id], isGroup: false });
+                    setShowCreate(false); setCreateIds(''); setCreateName('');
+                }
+            };
+
+            const getRoomName = (room) => {
+                if (room.name) return room.name;
+                if (room.memberIds) return room.memberIds.filter(id => id !== currentUser.id).join(', ') || room.name;
+                return '대화방';
+            };
+
+            const getRoomInitial = (room) => {
+                const name = getRoomName(room);
+                return room.isGroup ? '👥' : name[0]?.toUpperCase() || '?';
+            };
+
+            const filteredRooms = rooms.filter(r => getRoomName(r).toLowerCase().includes(roomSearch.toLowerCase()));
+
+            // ── 새 대화 생성 패널 ──
+            return (
+                <div className="anim-fade-up" style={{display:'flex', height:'calc(100vh - 140px)', borderRadius:'24px', overflow:'hidden', border:'1px solid var(--glass-border)', background:'var(--glass-bg)', backdropFilter:'blur(28px) saturate(180%)', WebkitBackdropFilter:'blur(28px) saturate(180%)', boxShadow:'var(--glass-shadow)'}}>
+
+                    {/* ── 왼쪽: 대화방 목록 ── */}
+                    <div style={{width:'300px', flexShrink:0, borderRight:'1px solid var(--glass-border)', display:'flex', flexDirection:'column', background:'var(--glass-bg2)'}}>
+                        {/* 헤더 */}
+                        <div style={{padding:'20px 18px 14px', borderBottom:'1px solid var(--glass-border)'}}>
+                            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'14px'}}>
+                                <span style={{fontSize:'16px', fontWeight:900, color:'var(--text)'}}>Messages</span>
+                                <button onClick={()=>{setShowCreate(true); setActiveRoom(null);}}
+                                    style={{width:'32px', height:'32px', borderRadius:'10px', border:'1.5px solid var(--glass-border)', background:'var(--glass-bg)', cursor:'pointer', fontSize:'18px', color:'var(--accent)', display:'flex', alignItems:'center', justifyContent:'center', transition:'all 0.15s'}}
+                                    onMouseEnter={e=>{e.currentTarget.style.background='rgba(79,110,247,0.12)';}}
+                                    onMouseLeave={e=>{e.currentTarget.style.background='var(--glass-bg)';}}>✏️</button>
+                            </div>
+                            <input value={roomSearch} onChange={e=>setRoomSearch(e.target.value)}
+                                placeholder="🔍  대화 검색"
+                                style={{width:'100%', fontSize:'12px', fontWeight:700, padding:'9px 14px', borderRadius:'12px'}} />
+                        </div>
+
+                        {/* 대화방 목록 */}
+                        <div style={{flex:1, overflowY:'auto'}}>
+                            {filteredRooms.length === 0 && (
+                                <div style={{padding:'40px 20px', textAlign:'center', fontSize:'11px', fontWeight:700, opacity:0.2, textTransform:'uppercase', letterSpacing:'0.12em'}}>
+                                    {roomSearch ? '검색 결과 없음' : '대화방이 없습니다'}
+                                </div>
+                            )}
+                            {filteredRooms.map(room => {
+                                const isActive = activeRoom?.id === room.id;
+                                return (
+                                    <div key={room.id} onClick={()=>{setActiveRoom(room); setShowCreate(false);}}
+                                        style={{display:'flex', alignItems:'center', gap:'12px', padding:'12px 18px', cursor:'pointer', transition:'background 0.15s', background: isActive ? 'rgba(79,110,247,0.1)' : 'transparent', borderLeft: isActive ? '3px solid var(--accent)' : '3px solid transparent'}}
+                                        onMouseEnter={e=>{if(!isActive) e.currentTarget.style.background='var(--glass-bg)';}}
+                                        onMouseLeave={e=>{if(!isActive) e.currentTarget.style.background='transparent';}}>
+                                        {/* 아바타 */}
+                                        <div style={{width:'44px', height:'44px', borderRadius:'50%', background: isActive ? 'linear-gradient(135deg, var(--accent), var(--accent2))' : 'var(--glass-bg)', border:'1.5px solid var(--glass-border)', display:'flex', alignItems:'center', justifyContent:'center', fontSize: room.isGroup ? '18px' : '16px', fontWeight:900, color: isActive ? '#fff' : 'var(--text)', flexShrink:0}}>
+                                            {getRoomInitial(room)}
+                                        </div>
+                                        <div style={{flex:1, minWidth:0}}>
+                                            <div style={{fontSize:'13px', fontWeight:800, color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{getRoomName(room)}</div>
+                                            <div style={{fontSize:'11px', fontWeight:600, opacity:0.4, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', marginTop:'2px'}}>{room.lastMessage || '대화를 시작하세요'}</div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    {/* ── 오른쪽: 채팅 영역 ── */}
+                    <div style={{flex:1, display:'flex', flexDirection:'column', minWidth:0}}>
+                        {showCreate ? (
+                            <div style={{flex:1, display:'flex', alignItems:'center', justifyContent:'center', padding:'40px'}}>
+                                <div style={{width:'100%', maxWidth:'380px'}}>
+                                    <h3 style={{fontSize:'18px', fontWeight:900, color:'var(--text)', marginBottom:'6px'}}>새 대화 시작</h3>
+                                    <p style={{fontSize:'12px', fontWeight:700, opacity:0.35, marginBottom:'28px'}}>1:1 또는 여러 명의 ID를 쉼표로 구분해 입력하세요</p>
+                                    <div style={{display:'flex', flexDirection:'column', gap:'12px'}}>
+                                        <div>
+                                            <label style={{fontSize:'9px', fontWeight:900, opacity:0.4, textTransform:'uppercase', letterSpacing:'0.18em', display:'block', marginBottom:'8px', color:'var(--text)'}}>참여자 ID *</label>
+                                            <input autoFocus value={createIds} onChange={e=>setCreateIds(e.target.value)}
+                                                onKeyDown={e=>e.key==='Enter'&&createRoom()}
+                                                placeholder="예: user1 또는 user1, user2, user3"
+                                                style={{width:'100%', fontSize:'14px', fontWeight:700}} />
+                                        </div>
+                                        <div>
+                                            <label style={{fontSize:'9px', fontWeight:900, opacity:0.4, textTransform:'uppercase', letterSpacing:'0.18em', display:'block', marginBottom:'8px', color:'var(--text)'}}>대화방 이름 (선택)</label>
+                                            <input value={createName} onChange={e=>setCreateName(e.target.value)}
+                                                onKeyDown={e=>e.key==='Enter'&&createRoom()}
+                                                placeholder="그룹 이름 (비우면 자동 설정)"
+                                                style={{width:'100%', fontSize:'14px', fontWeight:700}} />
+                                        </div>
+                                        <div style={{display:'flex', gap:'10px', marginTop:'8px'}}>
+                                            <button onClick={()=>setShowCreate(false)} style={{flex:1, padding:'12px', borderRadius:'16px', border:'1.5px solid var(--glass-border)', background:'var(--glass-bg2)', cursor:'pointer', fontSize:'13px', fontWeight:800, color:'var(--text-sub)', fontFamily:'Pretendard,sans-serif'}}>취소</button>
+                                            <button onClick={createRoom} disabled={creating||!createIds.trim()} className="btn-primary" style={{flex:1, padding:'12px', opacity:!createIds.trim()?0.4:1}}>
+                                                {creating ? '생성 중...' : '대화 시작'}
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : activeRoom ? (
+                            <>
+                                {/* 채팅 헤더 */}
+                                <div style={{padding:'16px 24px', borderBottom:'1px solid var(--glass-border)', display:'flex', alignItems:'center', gap:'14px', flexShrink:0, background:'var(--glass-bg2)'}}>
+                                    <div style={{width:'38px', height:'38px', borderRadius:'50%', background:'linear-gradient(135deg, var(--accent), var(--accent2))', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'15px', fontWeight:900, color:'#fff', flexShrink:0}}>
+                                        {getRoomInitial(activeRoom)}
+                                    </div>
+                                    <div>
+                                        <div style={{fontSize:'15px', fontWeight:900, color:'var(--text)'}}>{getRoomName(activeRoom)}</div>
+                                        {activeRoom.memberIds && (
+                                            <div style={{fontSize:'10px', fontWeight:700, opacity:0.35, marginTop:'2px'}}>{activeRoom.memberIds.join(' · ')}</div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* 메시지 스크롤 영역 */}
+                                <div style={{flex:1, overflowY:'auto', padding:'20px 24px', display:'flex', flexDirection:'column', gap:'6px'}}>
+                                    {roomMessages.length === 0 && (
+                                        <div style={{flex:1, display:'flex', alignItems:'center', justifyContent:'center', fontSize:'12px', fontWeight:700, opacity:0.15, textTransform:'uppercase', letterSpacing:'0.15em'}}>대화를 시작해보세요</div>
+                                    )}
+                                    {roomMessages.map((m, i) => {
+                                        const isMine = m.fromUid === currentUser.uid || m.fromId === currentUser.id;
+                                        const prevMsg = roomMessages[i-1];
+                                        const sameAuthor = prevMsg && (prevMsg.fromId === m.fromId);
+                                        return (
+                                            <div key={m.id || i} style={{display:'flex', flexDirection: isMine ? 'row-reverse' : 'row', alignItems:'flex-end', gap:'8px', marginTop: sameAuthor ? '2px' : '12px'}}>
+                                                {/* 상대방 아바타 */}
+                                                {!isMine && (
+                                                    <div style={{width:'28px', height:'28px', borderRadius:'50%', background:'var(--glass-bg)', border:'1px solid var(--glass-border)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'11px', fontWeight:900, flexShrink:0, opacity: sameAuthor ? 0 : 1}}>
+                                                        {m.fromName?.[0] || '?'}
+                                                    </div>
+                                                )}
+                                                <div style={{display:'flex', flexDirection:'column', alignItems: isMine ? 'flex-end' : 'flex-start', maxWidth:'65%'}}>
+                                                    {!isMine && !sameAuthor && (
+                                                        <span style={{fontSize:'10px', fontWeight:800, opacity:0.45, marginBottom:'4px', marginLeft:'4px'}}>{m.fromName}</span>
+                                                    )}
+                                                    <div style={{
+                                                        padding:'10px 14px',
+                                                        borderRadius: isMine ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
+                                                        background: isMine ? 'linear-gradient(135deg, var(--accent), var(--accent2))' : 'var(--glass-bg)',
+                                                        border: isMine ? 'none' : '1px solid var(--glass-border)',
+                                                        backdropFilter:'blur(12px)',
+                                                        boxShadow: isMine ? '0 2px 12px rgba(79,110,247,0.3)' : 'var(--card-shadow)',
+                                                    }}>
+                                                        <div style={{fontSize:'13px', fontWeight:600, lineHeight:1.5, color: isMine ? '#fff' : 'var(--text)', wordBreak:'break-word'}}>{m.text}</div>
+                                                    </div>
+                                                    <span style={{fontSize:'9px', fontWeight:700, opacity:0.3, marginTop:'3px', marginLeft:'4px', marginRight:'4px'}}>{m.time}</span>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                    <div ref={msgEndRef} />
+                                </div>
+
+                                {/* 메시지 입력바 */}
+                                <div style={{padding:'14px 24px', borderTop:'1px solid var(--glass-border)', display:'flex', gap:'10px', alignItems:'flex-end', background:'var(--glass-bg2)', flexShrink:0}}>
+                                    <textarea ref={inputRef}
+                                        value={msgInput} onChange={e=>setMsgInput(e.target.value)}
+                                        onKeyDown={e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); sendMsg(); } }}
+                                        placeholder="메시지 입력… (Enter 전송, Shift+Enter 줄바꿈)"
+                                        rows={1}
+                                        style={{flex:1, resize:'none', fontSize:'13px', fontWeight:600, lineHeight:1.6, background:'var(--glass-bg)', border:'1.5px solid var(--glass-border)', borderRadius:'16px', padding:'10px 16px', color:'var(--text)', fontFamily:'Pretendard,sans-serif', outline:'none', maxHeight:'120px', overflowY:'auto'}}
+                                        onFocus={e=>{e.target.style.borderColor='var(--accent)'; e.target.style.boxShadow='0 0 0 3px rgba(79,110,247,0.1)';}}
+                                        onBlur={e=>{e.target.style.borderColor='var(--glass-border)'; e.target.style.boxShadow='none';}}
+                                        onInput={e=>{ e.target.style.height='auto'; e.target.style.height=Math.min(e.target.scrollHeight, 120)+'px'; }}
+                                    />
+                                    <button onClick={sendMsg} disabled={sending||!msgInput.trim()}
+                                        style={{width:'40px', height:'40px', borderRadius:'14px', border:'none', cursor:'pointer', background: msgInput.trim() ? 'var(--accent)' : 'var(--glass-bg)', color: msgInput.trim() ? '#fff' : 'var(--text-sub)', fontSize:'18px', display:'flex', alignItems:'center', justifyContent:'center', transition:'all 0.15s', flexShrink:0, boxShadow: msgInput.trim() ? '0 4px 12px rgba(79,110,247,0.35)' : 'none', opacity: sending ? 0.6 : 1}}>
+                                        ↑
+                                    </button>
+                                </div>
+                            </>
+                        ) : (
+                            /* 빈 상태 */
+                            <div style={{flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:'16px', opacity:0.3}}>
+                                <div style={{fontSize:'48px'}}>💬</div>
+                                <div style={{fontSize:'14px', fontWeight:800, textTransform:'uppercase', letterSpacing:'0.15em'}}>대화를 선택하거나</div>
+                                <div style={{fontSize:'12px', fontWeight:700, opacity:0.7}}>✏️ 버튼으로 새 대화를 시작하세요</div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        // ─── SettingsView ────────────────────────────────────────────────────
+
+        function SettingsSection({label, children}) {
+            return (
+                <div style={{marginBottom:'24px'}}>
+                    <p style={{fontSize:'9px', fontWeight:900, opacity:0.35, textTransform:'uppercase', letterSpacing:'0.2em', marginBottom:'12px', color:'var(--text)'}}>{label}</p>
+                    {children}
+                </div>
+            );
+        }
+
+        function SettingsView({ currentUser, userRole, theme, suneungDate, getDDay, onThemeChange, onRoleChange, onSuneungChange, onSchoolChange }) {
+            const [school, setSchool] = useState(currentUser.school || '');
+            const [saved, setSaved] = useState(false);
+            const saveSchool = async () => { await onSchoolChange(school); setSaved(true); setTimeout(()=>setSaved(false), 2000); };
+
+            const THEMES = [{id:'light', icon:'☀️', label:'Light'},{id:'dark',icon:'🌙',label:'Dark'},{id:'midnight',icon:'🌑',label:'Midnight'}];
+            const ROLES  = [{id:'학생',icon:'🎓'},{id:'선생님',icon:'👨‍🏫'},{id:'관리자',icon:'👑'}];
+
+            return (
+                <div style={{maxWidth:'560px', margin:'0 auto'}} className="anim-fade-up">
+                    <div className="glass-card-lg" style={{padding:'32px'}}>
+                        <h3 style={{fontSize:'18px', fontWeight:900, color:'var(--text)', marginBottom:'28px', paddingBottom:'16px', borderBottom:'1px solid var(--glass-border)'}}>⚙️ 계정 및 설정</h3>
+
+                        {/* 학교명 */}
+                        <SettingsSection label="School Name">
+                            <div style={{display:'flex', gap:'10px'}}>
+                                <input value={school} onChange={e=>setSchool(e.target.value)} placeholder="학교 이름" style={{flex:1}} />
+                                <button className="btn-primary" onClick={saveSchool} style={{flexShrink:0, padding:'12px 20px'}}>
+                                    {saved ? '✓ 저장됨' : '저장'}
+                                </button>
+                            </div>
+                        </SettingsSection>
+
+                        {/* 테마 */}
+                        <SettingsSection label="Visual Theme">
+                            <div style={{display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'8px'}}>
+                                {THEMES.map(t => (
+                                    <button key={t.id} onClick={() => onThemeChange(t.id)}
+                                        style={{padding:'14px', borderRadius:'18px', border: theme===t.id ? '2px solid var(--accent)' : '1.5px solid var(--glass-border)', background: theme===t.id ? 'rgba(79,110,247,0.12)' : 'var(--glass-bg2)', cursor:'pointer', transition:'all 0.2s', fontFamily:'Pretendard, sans-serif', fontWeight:800, fontSize:'12px', color: theme===t.id ? 'var(--accent)' : 'var(--text-sub)', display:'flex', flexDirection:'column', alignItems:'center', gap:'6px'}}>
+                                        <span style={{fontSize:'20px'}}>{t.icon}</span>
+                                        {t.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </SettingsSection>
+
+                        {/* 역할 */}
+                        <SettingsSection label="Access Role">
+                            <div style={{display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'8px'}}>
+                                {ROLES.map(r => (
+                                    <button key={r.id} onClick={() => onRoleChange(r.id)}
+                                        style={{padding:'14px', borderRadius:'18px', border: userRole===r.id ? '2px solid var(--accent)' : '1.5px solid var(--glass-border)', background: userRole===r.id ? 'rgba(79,110,247,0.12)' : 'var(--glass-bg2)', cursor:'pointer', transition:'all 0.2s', fontFamily:'Pretendard, sans-serif', fontWeight:800, fontSize:'12px', color: userRole===r.id ? 'var(--accent)' : 'var(--text-sub)', display:'flex', flexDirection:'column', alignItems:'center', gap:'6px'}}>
+                                        <span style={{fontSize:'20px'}}>{r.icon}</span>
+                                        {r.id}
+                                    </button>
+                                ))}
+                            </div>
+                        </SettingsSection>
+
+                        {/* 수능 D-Day */}
+                        <SettingsSection label="수능 D-Day">
+                            <input type="date" value={suneungDate} onChange={e=>onSuneungChange(e.target.value)} />
+                            <p style={{fontSize:'12px', fontWeight:800, color:'var(--accent)', marginTop:'10px', opacity:0.8}}>현재: {getDDay(suneungDate)}</p>
+                        </SettingsSection>
+                    </div>
+                </div>
+            );
+        }
+
+        // ─── AuthPage ────────────────────────────────────────────────────────
+
+        function AuthPage({ onAuth }) {
+            const [mode, setMode] = useState('login');
+            const [id, setId]     = useState('');
+            const [pw, setPw]     = useState('');
+            const [name, setName] = useState('');
+            const [loading, setLoading] = useState(false);
+
+            const submit = async () => {
+                if (!id || !pw) return;
+                if (mode === 'join' && !name) return;
+                setLoading(true);
+                await onAuth(id, pw, name, mode);
+                setLoading(false);
+            };
+
+            const onKey = (e) => { if (e.key === 'Enter') submit(); };
+
+            return (
+                <div style={{height:'100vh', width:'100vw', background:'linear-gradient(145deg, #02040e 0%, #060110 50%, #020309 100%)', display:'flex', alignItems:'center', justifyContent:'center', padding:'20px', overflow:'hidden', position:'relative'}}>
+                    {/* 오로라 블롭 */}
+                    {/* 1. 인디고 – 좌상단 출발, 화면을 가로질러 드리프트 */}
+                    <div style={{position:'absolute', top:'-20%', left:'-15%', width:'68%', height:'66%',
+                        background:'radial-gradient(ellipse at 38% 42%, #4338ca 0%, #3730a3 28%, transparent 68%)',
+                        filter:'blur(58px)',
+                        borderRadius:'62% 38% 54% 46% / 48% 62% 38% 52%',
+                        animation:'drift1 26s cubic-bezier(0.45,0.05,0.55,0.95) infinite'}}></div>
+
+                    {/* 2. 바이올렛 – 우하단 출발, 좌상 방향으로 드리프트 */}
+                    <div style={{position:'absolute', bottom:'-20%', right:'-15%', width:'62%', height:'62%',
+                        background:'radial-gradient(ellipse at 58% 58%, #7c3aed 0%, #6d28d9 25%, transparent 65%)',
+                        filter:'blur(64px)',
+                        borderRadius:'44% 56% 38% 62% / 56% 44% 56% 44%',
+                        animation:'drift2 32s cubic-bezier(0.45,0.05,0.55,0.95) infinite'}}></div>
+
+                    {/* 3. 로즈 – 좌하단, 위로 솟구치며 드리프트 */}
+                    <div style={{position:'absolute', bottom:'-10%', left:'-6%', width:'42%', height:'42%',
+                        background:'radial-gradient(ellipse at 40% 60%, #be185d 0%, #9d174d 22%, transparent 65%)',
+                        filter:'blur(56px)',
+                        borderRadius:'52% 48% 44% 56% / 58% 42% 58% 42%',
+                        animation:'drift3 28s cubic-bezier(0.45,0.05,0.55,0.95) infinite 4s'}}></div>
+
+                    {/* 4. 시안 – 우상단, 좌하 방향으로 드리프트 */}
+                    <div style={{position:'absolute', top:'-6%', right:'-6%', width:'40%', height:'44%',
+                        background:'radial-gradient(ellipse at 55% 38%, #0891b2 0%, #0e7490 22%, transparent 65%)',
+                        filter:'blur(52px)',
+                        borderRadius:'56% 44% 62% 38% / 44% 56% 44% 56%',
+                        animation:'drift4 20s cubic-bezier(0.45,0.05,0.55,0.95) infinite 2s'}}></div>
+
+                    {/* 5. 일렉트릭 블루 – 중앙, 유영 */}
+                    <div style={{position:'absolute', top:'32%', left:'30%', width:'30%', height:'30%',
+                        background:'radial-gradient(ellipse, #2563eb 0%, transparent 62%)',
+                        filter:'blur(48px)', borderRadius:'50%',
+                        animation:'drift5 16s cubic-bezier(0.45,0.05,0.55,0.95) infinite 1s'}}></div>
+
+                    {/* 6. 골드 – 우측 포인트, 느린 궤도 */}
+                    <div style={{position:'absolute', top:'55%', right:'10%', width:'16%', height:'26%',
+                        background:'radial-gradient(ellipse, #b45309 0%, transparent 60%)',
+                        opacity:0.10, filter:'blur(40px)', borderRadius:'50%',
+                        animation:'drift1 42s cubic-bezier(0.45,0.05,0.55,0.95) infinite 18s'}}></div>
+
+                    {/* 노이즈 그레인 오버레이 */}
+                    <div style={{position:'absolute', inset:0, opacity:0.12, pointerEvents:'none',
+                        backgroundImage:'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'300\' height=\'300\'%3E%3Cfilter id=\'n\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.85\' numOctaves=\'4\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23n)\'/%3E%3C/svg%3E")',
+                        backgroundRepeat:'repeat', backgroundSize:'300px'}}></div>
+
+                    {/* 카드 */}
+                    <div className="anim-scale-in" style={{background:'rgba(255,255,255,0.05)', backdropFilter:'blur(40px) saturate(180%)', WebkitBackdropFilter:'blur(40px) saturate(180%)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:'36px', padding:'40px 44px', width:'100%', maxWidth:'420px', textAlign:'center', boxShadow:'0 32px 80px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.1)', position:'relative', zIndex:1}}>
+                        <div style={{fontSize:'38px', fontWeight:900, letterSpacing:'-1.5px', color:'#fff', marginBottom:'6px', animation:'fadeInUp 0.5s ease both'}}>
+                            HIGH.<span style={{color:'#60a5fa'}}>ST</span>
+                        </div>
+                        <p style={{fontSize:'10px', fontWeight:800, color:'rgba(96,165,250,0.7)', textTransform:'uppercase', letterSpacing:'0.3em', marginBottom:'28px', animation:'fadeInUp 0.5s ease 0.1s both'}}>
+                            {mode === 'login' ? 'Next-Gen Learning OS' : 'Forge Your Destiny'}
+                        </p>
+
+                        <div style={{display:'flex', flexDirection:'column', gap:'10px', textAlign:'left', animation:'fadeInUp 0.5s ease 0.2s both'}}>
+                            {[
+                                {ph:'ID', val:id, set:setId, type:'text'},
+                                {ph:'비밀번호', val:pw, set:setPw, type:'password'},
+                                ...(mode==='join'?[{ph:'이름', val:name, set:setName, type:'text'}]:[])
+                            ].map((f,i) => (
+                                <input key={i}
+                                    type={f.type} placeholder={f.ph} value={f.val}
+                                    onChange={e=>f.set(e.target.value)} onKeyDown={onKey}
+                                    style={{background:'rgba(255,255,255,0.06)', border:'1.5px solid rgba(255,255,255,0.1)', color:'#fff', borderRadius:'16px', padding:'13px 18px', fontSize:'14px', fontWeight:700, fontFamily:'Pretendard,sans-serif', outline:'none', width:'100%'}}
+                                    onFocus={e=>{e.target.style.borderColor='rgba(96,165,250,0.5)'; e.target.style.boxShadow='0 0 0 3px rgba(96,165,250,0.1)';}}
+                                    onBlur={e=>{e.target.style.borderColor='rgba(255,255,255,0.1)'; e.target.style.boxShadow='none';}}
+                                />
+                            ))}
+                            <button
+                                onClick={submit} disabled={loading}
+                                style={{width:'100%', padding:'14px', borderRadius:'18px', border:'none', background:'linear-gradient(135deg, #3b82f6, #6366f1)', color:'#fff', fontWeight:900, fontSize:'14px', fontFamily:'Pretendard,sans-serif', cursor:loading?'default':'pointer', opacity:loading?0.6:1, marginTop:'4px', boxShadow:'0 6px 24px rgba(59,130,246,0.4)', transition:'all 0.2s', letterSpacing:'0.03em'}}
+                                onMouseEnter={e=>{if(!loading){e.target.style.transform='translateY(-1px)'; e.target.style.boxShadow='0 8px 28px rgba(59,130,246,0.5)';}}}
+                                onMouseLeave={e=>{e.target.style.transform=''; e.target.style.boxShadow='0 6px 24px rgba(59,130,246,0.4)';}}>
+                                {loading ? '...' : mode==='login' ? 'Authenticate →' : 'Create Account →'}
+                            </button>
+                        </div>
+
+                        <div style={{marginTop:'20px', fontSize:'11px', fontWeight:700, color:'rgba(255,255,255,0.25)', cursor:'pointer', letterSpacing:'0.05em'}}
+                            onClick={()=>{setMode(mode==='login'?'join':'login'); setId(''); setPw(''); setName('');}}>
+                            {mode==='login' ? '계정이 없으신가요? ' : '이미 계정이 있으신가요? '}
+                            <span style={{color:'#60a5fa', textDecoration:'underline'}}>{mode==='login' ? 'Register' : 'Login'}</span>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // ─── 앱 마운트 ───────────────────────────────────────────────────────
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
