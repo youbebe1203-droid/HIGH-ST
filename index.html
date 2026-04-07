@@ -2679,100 +2679,172 @@
             const gap = isMobileUI ? 3 : 6;
 
             // ── 공통: 달력 그리드 ──────────────────────────────────────────────
-            const CalGrid = () => (
-                <>
-                    <div style={{display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:`${gap}px`, marginBottom:`${gap}px`}}>
-                        {['일','월','화','수','목','금','토'].map((d,i) => (
-                            <div key={d} style={{textAlign:'center', fontSize: isMobileUI ? '9px' : '10px', fontWeight:800, opacity:0.3, padding:'4px 0', color: i===0?'#ef4444':i===6?'#60a5fa':'var(--text-sub)'}}>{d}</div>
-                        ))}
-                    </div>
-                    <div style={{display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:`${gap}px`}}>
-                        {days.map((d, i) => {
-                            const isToday = d === now.getDate();
-                            const events  = d ? calendarEvents.filter(e => e.month === month && e.year === year && d >= e.day && d <= (e.endDay || e.day)) : [];
-                            const isSelected = addingDay === d;
+            const CalGrid = () => {
+                // 7일씩 주 단위로 분할
+                const weeks = [];
+                for (let i = 0; i < days.length; i += 7) weeks.push(days.slice(i, i + 7));
+                const monthEvts = calendarEvents.filter(e => e.month === month && e.year === year);
+
+                return (
+                    <>
+                        {/* 요일 헤더 */}
+                        <div style={{display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:`${gap}px`, marginBottom:`${gap}px`}}>
+                            {['일','월','화','수','목','금','토'].map((d,i) => (
+                                <div key={d} style={{textAlign:'center', fontSize:isMobileUI?'9px':'10px', fontWeight:800, opacity:0.3, padding:'4px 0',
+                                    color:i===0?'#ef4444':i===6?'#60a5fa':'var(--text-sub)'}}>{d}</div>
+                            ))}
+                        </div>
+
+                        {/* 주 단위 렌더링 */}
+                        {weeks.map((week, wi) => {
+                            const validDays = week.filter(Boolean);
+                            if (!validDays.length) return null;
+                            const weekMin = Math.min(...validDays);
+                            const weekMax = Math.max(...validDays);
+
+                            // 이 주에 겹치는 이벤트 분류
+                            const weekEvts = monthEvts.filter(e => { const eE = e.endDay||e.day; return e.day<=weekMax && eE>=weekMin; });
+                            const multiEvts  = weekEvts.filter(e => e.endDay && e.endDay > e.day);
+                            const singleEvts = weekEvts.filter(e => !e.endDay || e.endDay <= e.day);
+
+                            // 멀티데이 이벤트: 이 주 안에서 시작/끝 컬럼 계산
+                            const multiLayouts = multiEvts.map(e => {
+                                const clampS = Math.max(e.day, weekMin);
+                                const clampE = Math.min(e.endDay, weekMax);
+                                const si = week.findIndex(d => d === clampS);
+                                const ei = week.findIndex(d => d === clampE);
+                                if (si === -1 || ei === -1) return null;
+                                return { event:e, colStart:si+1, colSpan:ei-si+1, isStart:e.day>=weekMin, isEnd:e.endDay<=weekMax };
+                            }).filter(Boolean);
+
                             return (
-                                <div key={i}
-                                    className={d ? (isMobileUI ? 'cal-cell-mob' : 'cal-cell') : ''}
-                                    style={{cursor: d ? 'pointer' : 'default', opacity: d ? 1 : 0,
-                                        border: isSelected ? '2px solid var(--accent)' : isToday ? '2px solid var(--accent)' : undefined,
-                                        background: isSelected ? 'rgba(79,110,247,0.12)' : isToday ? 'rgba(79,110,247,0.06)' : undefined}}
-                                    onClick={() => clickDay(d)}>
-                                    {d && <>
-                                        <div style={{fontSize: isMobileUI ? '10px' : '12px', fontWeight: isToday ? 900 : 700, color: isToday||isSelected ? 'var(--accent)' : 'var(--text)', opacity: isToday||isSelected ? 1 : 0.6, marginBottom: isMobileUI ? '2px' : '4px', textAlign: isMobileUI ? 'center' : undefined}}>{d}</div>
-                                        {isMobileUI ? (
-                                            events.length > 0 && (
-                                                <div style={{display:'flex', justifyContent:'center', gap:'2px', flexWrap:'wrap'}}>
-                                                    {events.slice(0,3).map((_,idx) => <div key={idx} style={{width:'5px', height:'5px', borderRadius:'50%', background:'var(--accent)', flexShrink:0}} />)}
+                                <div key={wi} style={{marginBottom:`${gap}px`}}>
+                                    {/* 날짜 셀 (단일 이벤트만 셀 내부에 표시) */}
+                                    <div style={{display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:`${gap}px`}}>
+                                        {week.map((d, di) => {
+                                            const isToday = d === now.getDate();
+                                            const isSelected = addingDay === d;
+                                            const textColor = di===0?'#ef4444':di===6?'#60a5fa':'var(--text)';
+                                            const cellEvts = d ? singleEvts.filter(e => e.day===d) : [];
+                                            return (
+                                                <div key={di}
+                                                    className={d?(isMobileUI?'cal-cell-mob':'cal-cell'):''}
+                                                    style={{cursor:d?'pointer':'default', opacity:d?1:0,
+                                                        border:isSelected?'2px solid var(--accent)':isToday?'2px solid var(--accent)':undefined,
+                                                        background:isSelected?'rgba(79,110,247,0.12)':isToday?'rgba(79,110,247,0.06)':undefined}}
+                                                    onClick={()=>clickDay(d)}>
+                                                    {d && <>
+                                                        <div style={{fontSize:isMobileUI?'10px':'12px', fontWeight:isToday?900:700,
+                                                            color:isToday||isSelected?'var(--accent)':textColor,
+                                                            opacity:isToday||isSelected?1:0.6,
+                                                            marginBottom:isMobileUI?'2px':'4px',
+                                                            textAlign:isMobileUI?'center':undefined}}>{d}</div>
+                                                        {!isMobileUI && (
+                                                            <div style={{display:'flex', flexDirection:'column', gap:'3px'}}>
+                                                                {cellEvts.map((e,idx) => (
+                                                                    <div key={idx} onClick={ev=>ev.stopPropagation()}
+                                                                        style={{display:'flex', alignItems:'center', gap:'3px', padding:'2px 5px 2px 6px', borderRadius:'6px', fontSize:'8px', fontWeight:800, color:'#fff', background:'var(--accent)', overflow:'hidden', minWidth:0}}>
+                                                                        <span style={{overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', flex:1}}>{e.text}</span>
+                                                                        {isCalAdmin && <span onClick={()=>onDeleteEvent(e.id)} style={{flexShrink:0, cursor:'pointer', opacity:0.6, fontSize:'10px', lineHeight:1, marginLeft:'2px'}}
+                                                                            onMouseEnter={ev=>ev.currentTarget.style.opacity='1'} onMouseLeave={ev=>ev.currentTarget.style.opacity='0.6'}>×</span>}
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                        {isMobileUI && cellEvts.length>0 && (
+                                                            <div style={{display:'flex', justifyContent:'center', gap:'2px', flexWrap:'wrap'}}>
+                                                                {cellEvts.slice(0,3).map((_,idx)=><div key={idx} style={{width:'5px',height:'5px',borderRadius:'50%',background:'var(--accent)',flexShrink:0}}/>)}
+                                                            </div>
+                                                        )}
+                                                    </>}
                                                 </div>
-                                            )
-                                        ) : (
-                                            <div style={{display:'flex', flexDirection:'column', gap:'3px'}}>
-                                                {events.map((e, idx) => (
-                                                    <div key={idx} onClick={ev=>ev.stopPropagation()}
-                                                        style={{display:'flex', alignItems:'center', gap:'3px', padding:'2px 5px 2px 6px', borderRadius:'6px', fontSize:'8px', fontWeight:800, color:'#fff', background:'var(--accent)', overflow:'hidden', minWidth:0}}>
-                                                        <span style={{overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', flex:1}}>{e.text}</span>
-                                                        <span onClick={()=>onDeleteEvent(e.id)} style={{flexShrink:0, cursor:'pointer', opacity:0.6, fontSize:'10px', lineHeight:1, marginLeft:'2px'}}
-                                                            onMouseEnter={ev=>ev.currentTarget.style.opacity='1'} onMouseLeave={ev=>ev.currentTarget.style.opacity='0.6'}>×</span>
+                                            );
+                                        })}
+                                    </div>
+
+                                    {/* 멀티데이 이벤트 바 (Google Calendar 스타일) */}
+                                    {multiLayouts.length > 0 && (
+                                        <div style={{display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:`${gap}px`, marginTop:'3px', gridAutoRows:isMobileUI?'14px':'18px', gridAutoFlow:'dense'}}>
+                                            {multiLayouts.map((l, li) => {
+                                                const br = l.isStart&&l.isEnd?'8px':l.isStart?'8px 0 0 8px':l.isEnd?'0 8px 8px 0':'0';
+                                                return (
+                                                    <div key={li}
+                                                        onClick={ev=>{ev.stopPropagation(); clickDay(l.event.day);}}
+                                                        style={{
+                                                            gridColumn:`${l.colStart} / span ${l.colSpan}`,
+                                                            display:'flex', alignItems:'center',
+                                                            padding:isMobileUI?'0 5px':'0 8px',
+                                                            borderRadius:br,
+                                                            background:'var(--accent)',
+                                                            fontSize:isMobileUI?'8px':'9px',
+                                                            fontWeight:800, color:'#fff',
+                                                            overflow:'hidden', cursor:'pointer', minWidth:0,
+                                                        }}>
+                                                        {l.isStart && <span style={{overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', flex:1}}>{l.event.text}</span>}
+                                                        {!l.isStart && <span style={{flex:1}}/>}
+                                                        {l.isEnd && isCalAdmin && (
+                                                            <span onClick={ev=>{ev.stopPropagation(); onDeleteEvent(l.event.id);}}
+                                                                style={{flexShrink:0, cursor:'pointer', opacity:0.7, fontSize:'11px', lineHeight:1, paddingLeft:'3px'}}>×</span>
+                                                        )}
                                                     </div>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </>}
+                                                );
+                                            })}
+                                        </div>
+                                    )}
                                 </div>
                             );
                         })}
-                    </div>
 
-                    {/* 날짜 클릭 시 일정 패널 */}
-                    {addingDay && (
-                        <div style={{marginTop: isMobileUI ? '12px' : '20px', padding: isMobileUI ? '12px 14px' : '14px 20px', borderRadius:'16px', background:'var(--glass-bg2)', border:'1px solid var(--glass-border)', animation:'slideUp 0.2s ease both'}}>
-                            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'10px'}}>
-                                <span style={{fontSize:'13px', fontWeight:900, color:'var(--accent)'}}>{addingDay}일 일정</span>
-                                <button onClick={()=>setAddingDay(null)} style={{background:'none',border:'none',cursor:'pointer',fontSize:'18px',color:'var(--text-sub)',opacity:0.4,lineHeight:1}}>×</button>
-                            </div>
-                            {(() => {
-                                const dayEvts = calendarEvents.filter(e => e.month === month && e.year === year && addingDay >= e.day && addingDay <= (e.endDay || e.day));
-                                return dayEvts.length > 0 ? (
-                                    <div style={{display:'flex', flexDirection:'column', gap:'6px', marginBottom:'10px'}}>
-                                        {dayEvts.map((e, idx) => (
-                                            <div key={idx} style={{display:'flex', alignItems:'center', justifyContent:'space-between', padding:'8px 12px', borderRadius:'10px', background:'rgba(79,110,247,0.08)', border:'1px solid rgba(79,110,247,0.18)'}}>
-                                                <div style={{flex:1, minWidth:0}}>
-                                                    <span style={{fontSize:'13px', fontWeight:700, color:'var(--text)'}}>{e.text}</span>
-                                                    {e.endDay && e.endDay !== e.day && <span style={{fontSize:'10px', fontWeight:700, opacity:0.45, marginLeft:'8px'}}>{e.day}~{e.endDay}일</span>}
-                                                </div>
-                                                {isCalAdmin && <button onClick={()=>onDeleteEvent(e.id)} style={{background:'none',border:'none',cursor:'pointer',fontSize:'16px',color:'#ef4444',opacity:0.5,lineHeight:1,flexShrink:0}}
-                                                    onMouseEnter={ev=>ev.currentTarget.style.opacity='1'} onMouseLeave={ev=>ev.currentTarget.style.opacity='0.5'}>×</button>}
-                                            </div>
-                                        ))}
-                                    </div>
-                                ) : <div style={{fontSize:'11px', opacity:0.3, marginBottom:'10px', fontWeight:700}}>등록된 일정이 없습니다</div>;
-                            })()}
-                            {isCalAdmin && (
-                                <div style={{display:'flex', flexDirection:'column', gap:'8px'}}>
-                                    <div style={{display:'flex', gap:'8px'}}>
-                                        <KorInput autoFocus value={eventText} onChange={e=>setEventText(e.target.value)}
-                                            onKeyDown={e=>{ if(e.key==='Enter') confirmEvent(); if(e.key==='Escape') setAddingDay(null); }}
-                                            placeholder="일정 이름 입력"
-                                            style={{flex:1, fontSize:'13px', fontWeight:700}} />
-                                        <button className="btn-primary" onClick={confirmEvent} disabled={saving||!eventText.trim()} style={{flexShrink:0, padding:'10px 16px', opacity:!eventText.trim()?0.4:1}}>
-                                            {saving?'...':'추가'}
-                                        </button>
-                                    </div>
-                                    <div style={{display:'flex', alignItems:'center', gap:'6px'}}>
-                                        <span style={{fontSize:'11px', fontWeight:700, opacity:0.4, whiteSpace:'nowrap'}}>{addingDay}일</span>
-                                        <span style={{fontSize:'11px', opacity:0.3}}>~</span>
-                                        <KorInput type="number" value={eventEndDay} onChange={e=>setEventEndDay(e.target.value)}
-                                            placeholder={`종료일 (선택, ${addingDay+1}~31)`} min={addingDay+1} max={31}
-                                            style={{flex:1, fontSize:'12px', fontWeight:700}} />
-                                        <span style={{fontSize:'11px', fontWeight:700, opacity:0.4}}>일</span>
-                                    </div>
+                        {/* 날짜 클릭 시 일정 패널 */}
+                        {addingDay && (
+                            <div style={{marginTop:isMobileUI?'12px':'20px', padding:isMobileUI?'12px 14px':'14px 20px', borderRadius:'16px', background:'var(--glass-bg2)', border:'1px solid var(--glass-border)', animation:'slideUp 0.2s ease both'}}>
+                                <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'10px'}}>
+                                    <span style={{fontSize:'13px', fontWeight:900, color:'var(--accent)'}}>{addingDay}일 일정</span>
+                                    <button onClick={()=>setAddingDay(null)} style={{background:'none',border:'none',cursor:'pointer',fontSize:'18px',color:'var(--text-sub)',opacity:0.4,lineHeight:1}}>×</button>
                                 </div>
-                            )}
-                        </div>
-                    )}
-                </>
-            );
+                                {(() => {
+                                    const dayEvts = calendarEvents.filter(e => e.month===month && e.year===year && addingDay>=e.day && addingDay<=(e.endDay||e.day));
+                                    return dayEvts.length > 0 ? (
+                                        <div style={{display:'flex', flexDirection:'column', gap:'6px', marginBottom:'10px'}}>
+                                            {dayEvts.map((e, idx) => (
+                                                <div key={idx} style={{display:'flex', alignItems:'center', justifyContent:'space-between', padding:'8px 12px', borderRadius:'10px', background:'rgba(79,110,247,0.08)', border:'1px solid rgba(79,110,247,0.18)'}}>
+                                                    <div style={{flex:1, minWidth:0}}>
+                                                        <span style={{fontSize:'13px', fontWeight:700, color:'var(--text)'}}>{e.text}</span>
+                                                        {e.endDay && e.endDay!==e.day && <span style={{fontSize:'10px', fontWeight:700, opacity:0.45, marginLeft:'8px'}}>{e.day}~{e.endDay}일</span>}
+                                                    </div>
+                                                    {isCalAdmin && <button onClick={()=>onDeleteEvent(e.id)} style={{background:'none',border:'none',cursor:'pointer',fontSize:'16px',color:'#ef4444',opacity:0.5,lineHeight:1,flexShrink:0}}
+                                                        onMouseEnter={ev=>ev.currentTarget.style.opacity='1'} onMouseLeave={ev=>ev.currentTarget.style.opacity='0.5'}>×</button>}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : <div style={{fontSize:'11px', opacity:0.3, marginBottom:'10px', fontWeight:700}}>등록된 일정이 없습니다</div>;
+                                })()}
+                                {isCalAdmin && (
+                                    <div style={{display:'flex', flexDirection:'column', gap:'8px'}}>
+                                        <div style={{display:'flex', gap:'8px'}}>
+                                            <KorInput autoFocus value={eventText} onChange={e=>setEventText(e.target.value)}
+                                                onKeyDown={e=>{ if(e.key==='Enter') confirmEvent(); if(e.key==='Escape') setAddingDay(null); }}
+                                                placeholder="일정 이름 입력"
+                                                style={{flex:1, fontSize:'13px', fontWeight:700}} />
+                                            <button className="btn-primary" onClick={confirmEvent} disabled={saving||!eventText.trim()} style={{flexShrink:0, padding:'10px 16px', opacity:!eventText.trim()?0.4:1}}>
+                                                {saving?'...':'추가'}
+                                            </button>
+                                        </div>
+                                        <div style={{display:'flex', alignItems:'center', gap:'6px'}}>
+                                            <span style={{fontSize:'11px', fontWeight:700, opacity:0.4, whiteSpace:'nowrap'}}>{addingDay}일</span>
+                                            <span style={{fontSize:'11px', opacity:0.3}}>~</span>
+                                            <KorInput type="number" value={eventEndDay} onChange={e=>setEventEndDay(e.target.value)}
+                                                placeholder={`종료일 (선택, ${addingDay+1}~31)`} min={addingDay+1} max={31}
+                                                style={{flex:1, fontSize:'12px', fontWeight:700}} />
+                                            <span style={{fontSize:'11px', fontWeight:700, opacity:0.4}}>일</span>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </>
+                );
+            };
 
             // ── 그룹 없음: 모바일 ─────────────────────────────────────────────
             if (!calendarGroup && isMobileUI) return (
