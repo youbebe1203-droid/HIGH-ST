@@ -2321,26 +2321,31 @@
             const [wCategory, setWCategory]= useState('공부');
 
             // comment state
-            const [comments,      setComments]      = useState([]);
-            const [localComments, setLocalComments] = useState({});   // { [postId]: [...] } for local-admin
-            const [commentInput,  setCommentInput]  = useState('');
+            const [comments,       setComments]       = useState([]);
+            const [localComments,  setLocalComments]  = useState({});   // { [postId]: [...] } for local-admin
+            const [commentCounts,  setCommentCounts]  = useState({});   // { [postId]: number } 실제 집계
+            const [commentInput,   setCommentInput]   = useState('');
             const [commentLoading, setCommentLoading] = useState(false);
             const commentEndRef = useRef(null);
 
             const isLocalAdmin = currentUser?.uid === 'local-admin';
 
-            // 댓글 로드: 상세 화면 진입 시 onSnapshot 구독 (로컬 어드민은 로컬 상태)
+            // 댓글 로드: 상세 화면 진입 시 onSnapshot 구독 → 실제 count 저장
             useEffect(() => {
                 if (mode !== 'detail' || !selectedPost) return;
                 if (isLocalAdmin) {
-                    setComments(localComments[selectedPost.id] || []);
+                    const lc = localComments[selectedPost.id] || [];
+                    setComments(lc);
+                    setCommentCounts(prev => ({ ...prev, [selectedPost.id]: lc.length }));
                     return;
                 }
                 const unsub = db.collection('posts').doc(selectedPost.id)
                     .collection('comments')
                     .orderBy('createdAt', 'asc')
                     .onSnapshot(snap => {
-                        setComments(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+                        const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                        setComments(docs);
+                        setCommentCounts(prev => ({ ...prev, [selectedPost.id]: docs.length }));
                     }, () => {});
                 return () => unsub();
             }, [selectedPost?.id, mode]);
@@ -2374,6 +2379,7 @@
                     const updated = [...(localComments[selectedPost.id] || []), newComment];
                     setLocalComments(prev => ({ ...prev, [selectedPost.id]: updated }));
                     setComments(updated);
+                    setCommentCounts(prev => ({ ...prev, [selectedPost.id]: updated.length }));
                 } else {
                     await db.collection('posts').doc(selectedPost.id).collection('comments').add({
                         authorId: currentUser.id,
@@ -2613,7 +2619,7 @@
                                             <span style={{fontSize:'10px', fontWeight:700, opacity:0.4}}>{p.authorName}</span>
                                             <span style={{fontSize:'10px', fontWeight:700, opacity:0.3}}>{p.date}</span>
                                             <div style={{display:'flex', gap:'10px', marginLeft:'auto', alignItems:'center'}}>
-                                                <span style={{fontSize:'10px', fontWeight:800, opacity:0.45}}>💬 {p.commentCount || 0}</span>
+                                                <span style={{fontSize:'10px', fontWeight:800, opacity:0.45}}>💬 {commentCounts[p.id] ?? p.commentCount ?? 0}</span>
                                                 <span onClick={e=>{ e.stopPropagation(); onLike(p.id,'like'); }}
                                                     style={{fontSize:'10px', fontWeight:800, cursor:'pointer', color:(p.likedBy||[]).includes(currentUser?.uid)?'var(--accent)':'var(--text-sub)', opacity:(p.likedBy||[]).includes(currentUser?.uid)?1:0.45, transition:'all 0.15s'}}>
                                                     👍 {p.likes || 0}
