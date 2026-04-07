@@ -121,10 +121,65 @@ npx serve .
 - **실시간 리스너(onSnapshot)는 공용 데이터에만 적용된다.**  
   개인 todos/inbox는 로그인 시 1회 읽기로 충분하다.
 
+## 코드 구조 (index.html 내부)
+
+### FS — Firebase 서비스 레이어
+모든 Firestore/Storage 호출은 `FS` 네임스페이스를 통해서만 한다. 컴포넌트 내에서 `db.collection()` 직접 호출 금지.
+
+```javascript
+// 예시
+await FS.addPost({ title, content, authorUid });
+await FS.updateUser(uid, { theme: 'dark' });
+const unsub = FS.listenPosts(snap => setPosts(...), err => ...);
+```
+
+### S — 공통 인라인 스타일 상수
+반복되는 인라인 스타일은 `S` 객체를 사용한다.
+
+```javascript
+// 예시
+<div style={{...S.glassCard, padding:'24px'}}>
+<button style={S.btnPrimary}>확인</button>
+```
+
+### Context
+- `AuthContext` — currentUser, userRole, theme
+- `DataContext` — todos, posts, resources, announcements, rooms, studyGroups, calendarGroup, calendarEvents
+- `StudyContext` — studyTime, suneungDate, selectedDate
+
 ## 새 기능 추가 방법
 
 1. Firestore에 새 컬렉션 추가
 2. Firebase 콘솔 → Firestore → Rules에서 읽기/쓰기 규칙 추가
-3. `index.html`의 `App` 컴포넌트에 상태 및 핸들러 함수 추가
-4. `loadData` 함수에 초기 로드 로직 추가 (onSnapshot 또는 .get())
-5. 새 뷰 컴포넌트 작성 후 사이드바 네비게이션에 연결
+3. `FS` 객체에 해당 컬렉션 헬퍼 함수 추가
+4. `index.html`의 `App` 컴포넌트에 상태 및 핸들러 함수 추가
+5. `loadData` 함수에 초기 로드 로직 추가 (onSnapshot 또는 .get())
+6. 새 뷰 컴포넌트 작성 후 사이드바 네비게이션에 연결
+
+## Android 앱 빌드
+
+### PWA (Android 홈화면 설치 — 현재 지원)
+`manifest.json` + `service-worker.js` 이미 포함됨.  
+Android Chrome → 주소창 메뉴 → **"홈 화면에 추가"** 또는 설치 배너 탭
+
+Chrome DevTools → Lighthouse → PWA 점수로 상태 확인 가능.
+
+### TWA (Play Store 등록 — 선택사항)
+PWA가 안정화된 후 Bubblewrap CLI로 APK 빌드.
+
+**사전 요건:**
+- Node.js 설치
+- Java JDK 11+
+- Android SDK (또는 Android Studio)
+
+**빌드 절차:**
+```bash
+npm install -g @bubblewrap/cli
+mkdir highst-android && cd highst-android
+bubblewrap init --manifest https://{username}.github.io/HIGH-ST/manifest.json
+# 설정 입력: package=com.highst.app, host={username}.github.io
+bubblewrap build
+# → app-release-signed.apk 생성
+```
+
+Play Store 등록: Google Play Console → 앱 만들기 → APK 업로드 → 개인정보처리방침 URL 필요.

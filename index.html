@@ -5,6 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HIGH.ST | 차세대 학습 관리 경험</title>
     <link rel="icon" type="image/png" href="favicon.png" />
+    <link rel="manifest" href="manifest.json" />
+    <meta name="theme-color" content="#4f6ef7" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="HIGH.ST" />
 
     <!-- React & Babel -->
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
@@ -38,6 +43,16 @@
         const auth    = firebase.auth();
         const db      = firebase.firestore();
         const storage = firebase.storage();
+    </script>
+
+    <!-- PWA Service Worker 등록 -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./service-worker.js')
+                    .catch(err => console.warn('[SW 등록 실패]', err));
+            });
+        }
     </script>
 
     <style>
@@ -588,7 +603,115 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useRef, useMemo } = React;
+        const { useState, useEffect, useRef, useMemo, useContext, createContext } = React;
+
+        // ─── Context ──────────────────────────────────────────────────────────
+        // currentUser, userRole, theme
+        const AuthContext  = createContext(null);
+        // todos, posts, resources, announcements, rooms, studyGroups, calendarGroup, calendarEvents, sharedEvents
+        const DataContext  = createContext(null);
+        // studyTime, suneungDate, selectedDate
+        const StudyContext = createContext(null);
+
+        // ─── Firebase 서비스 레이어 (FS) ──────────────────────────────────────
+        // 모든 Firestore/Storage 호출을 여기서 관리. 컴포넌트 내에서 직접 db.collection() 사용 금지.
+        const FS = {
+            // ── users ──
+            getUser:    (uid)        => db.collection('users').doc(uid).get(),
+            setUser:    (uid, data)  => db.collection('users').doc(uid).set(data),
+            updateUser: (uid, data)  => db.collection('users').doc(uid).update(data),
+            getUserId:  (id)         => db.collection('userIds').doc(id).get(),
+            setUserId:  (id, uid)    => db.collection('userIds').doc(id).set({ uid }),
+
+            // ── todos ──
+            getTodos:    (uid)        => db.collection('users').doc(uid).collection('todos').orderBy('date').get(),
+            addTodo:     (uid, data)  => db.collection('users').doc(uid).collection('todos').add(data),
+            updateTodo:  (uid, id, d) => db.collection('users').doc(uid).collection('todos').doc(id).update(d),
+            deleteTodo:  (uid, id)    => db.collection('users').doc(uid).collection('todos').doc(id).delete(),
+
+            // ── inbox (DM) ──
+            listenInbox: (uid, cb)   => db.collection('users').doc(uid).collection('inbox').onSnapshot(cb, () => {}),
+            sendInbox:   (uid, data) => db.collection('users').doc(uid).collection('inbox').add(data),
+
+            // ── posts ──
+            listenPosts:    (cb, err) => db.collection('posts').orderBy('createdAt', 'desc').onSnapshot(cb, err),
+            addPost:        (data)    => db.collection('posts').add({ ...data, createdAt: firebase.firestore.FieldValue.serverTimestamp() }),
+            updatePost:     (id, d)   => db.collection('posts').doc(id).update(d),
+            deletePost:     (id)      => db.collection('posts').doc(id).delete(),
+            listenComments: (pid, cb) => db.collection('posts').doc(pid).collection('comments').orderBy('createdAt', 'asc').onSnapshot(cb, () => {}),
+            addComment:     (pid, d)  => db.collection('posts').doc(pid).collection('comments').add({ ...d, createdAt: firebase.firestore.FieldValue.serverTimestamp() }),
+
+            // ── announcements ──
+            listenAnnouncements: (cb) => db.collection('announcements').orderBy('date', 'desc').onSnapshot(cb, () => {}),
+            addAnnouncement:     (d)  => db.collection('announcements').add(d),
+
+            // ── events (공용 달력 — 레거시) ──
+            listenEvents: (cb) => db.collection('events').onSnapshot(cb, () => {}),
+
+            // ── resources ──
+            listenResources: (cb) => db.collection('resources').orderBy('createdAt', 'desc').onSnapshot(cb, () => {}),
+            addResource:     (d)  => db.collection('resources').add(d),
+
+            // ── calendarGroups ──
+            getCalendarGroup:    (uid)       => db.collection('calendarGroups').where('members', 'array-contains', uid).limit(1).get().catch(() => null),
+            createCalendarGroup: (data)      => db.collection('calendarGroups').add(data),
+            updateCalendarGroup: (id, data)  => db.collection('calendarGroups').doc(id).update(data),
+            getCalendarGroupByCode: (code)   => db.collection('calendarGroups').where('code', '==', code).limit(1).get(),
+            listenCalendarGroup: (id, cb)    => db.collection('calendarGroups').doc(id).onSnapshot(cb, () => {}),
+            listenCalendarEvents:(id, cb)    => db.collection('calendarGroups').doc(id).collection('events').onSnapshot(cb, () => {}),
+            addCalendarEvent:    (gid, data) => db.collection('calendarGroups').doc(gid).collection('events').add(data),
+            deleteCalendarEvent: (gid, eid)  => db.collection('calendarGroups').doc(gid).collection('events').doc(eid).delete(),
+
+            // ── studyGroups ──
+            listenStudyGroups:  (uid, cb) => db.collection('studyGroups').where('members', 'array-contains', uid).onSnapshot(cb, () => {}),
+            createStudyGroup:   (data)    => db.collection('studyGroups').add(data),
+            updateStudyGroup:   (id, d)   => db.collection('studyGroups').doc(id).update(d),
+            deleteStudyGroup:   (id)      => db.collection('studyGroups').doc(id).delete(),
+            listenPresence:     (gid, cb) => db.collection('studyGroups').doc(gid).collection('presence').onSnapshot(cb, () => {}),
+            setPresence:        (gid, uid, d) => db.collection('studyGroups').doc(gid).collection('presence').doc(uid).set(d),
+            deletePresence:     (gid, uid)    => db.collection('studyGroups').doc(gid).collection('presence').doc(uid).delete(),
+
+            // ── rooms (메시지) ──
+            listenRooms:    (uid, cb) => db.collection('rooms').where('members', 'array-contains', uid).onSnapshot(cb, () => {}),
+            createRoom:     (data)    => db.collection('rooms').add(data),
+            updateRoom:     (id, d)   => db.collection('rooms').doc(id).update(d),
+            listenMessages: (rid, cb) => db.collection('rooms').doc(rid).collection('messages').orderBy('createdAt', 'asc').onSnapshot(cb, () => {}),
+            sendMessage:    (rid, d)  => db.collection('rooms').doc(rid).collection('messages').add({ ...d, createdAt: firebase.firestore.FieldValue.serverTimestamp() }),
+
+            // ── studyDays (히트맵) ──
+            getStudyDays: (cb) => db.collection('studyDays').get(),
+            updateStudyDay: (date, d) => db.collection('studyDays').doc(date).set(d, { merge: true }),
+
+            // ── Storage ──
+            uploadFile: (path, file) => {
+                const ref = storage.ref(path);
+                return ref.put(file).then(sn => sn.ref.getDownloadURL());
+            },
+
+            // ── Firestore 헬퍼 ──
+            increment:   (n) => firebase.firestore.FieldValue.increment(n),
+            arrayUnion:  (...v) => firebase.firestore.FieldValue.arrayUnion(...v),
+            arrayRemove: (...v) => firebase.firestore.FieldValue.arrayRemove(...v),
+            deleteField: ()  => firebase.firestore.FieldValue.delete(),
+            serverTs:    ()  => firebase.firestore.FieldValue.serverTimestamp(),
+            batch:       ()  => db.batch(),
+        };
+
+        // ─── 공통 인라인 스타일 상수 (S) ──────────────────────────────────────
+        const S = {
+            flexRow:      { display:'flex', alignItems:'center' },
+            flexCenter:   { display:'flex', alignItems:'center', justifyContent:'center' },
+            flexCol:      { display:'flex', flexDirection:'column' },
+            flexBetween:  { display:'flex', alignItems:'center', justifyContent:'space-between' },
+            glassCard:    { background:'var(--glass-bg)', backdropFilter:'blur(28px) saturate(180%)', WebkitBackdropFilter:'blur(28px) saturate(180%)', border:'1px solid var(--glass-border)', borderRadius:'28px' },
+            glassCardLg:  { background:'var(--glass-bg)', backdropFilter:'blur(40px) saturate(200%)', WebkitBackdropFilter:'blur(40px) saturate(200%)', border:'1px solid var(--glass-border)', borderRadius:'32px' },
+            glassInset:   { background:'var(--glass-bg2)', border:'1px solid var(--glass-border)', borderRadius:'16px' },
+            btnPrimary:   { padding:'11px 22px', borderRadius:'16px', border:'none', cursor:'pointer', fontWeight:900, fontFamily:'Pretendard,sans-serif', background:'var(--accent)', color:'#fff' },
+            btnSecondary: { padding:'10px 20px', borderRadius:'14px', border:'1.5px solid var(--glass-border)', cursor:'pointer', fontWeight:800, fontFamily:'Pretendard,sans-serif', background:'var(--glass-bg2)', color:'var(--text-sub)' },
+            label:        { fontSize:'9px', fontWeight:900, opacity:0.35, textTransform:'uppercase', letterSpacing:'0.2em', color:'var(--text)' },
+            textSub:      { fontSize:'11px', fontWeight:700, opacity:0.4, color:'var(--text)' },
+            accentText:   { color:'var(--accent)', fontWeight:800 },
+        };
 
         // ─── 과목 상수 ───────────────────────────────────────────────────────
         const SUBJECTS = [
