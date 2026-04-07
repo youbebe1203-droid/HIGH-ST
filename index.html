@@ -882,26 +882,35 @@
                     const g = { id: 'local-cal', name, code, ownerUid: 'local-admin', members: ['local-admin'] };
                     setCalendarGroup(g); return;
                 }
-                const ref = await db.collection('calendarGroups').add({
-                    name, code, ownerUid: currentUser.uid,
-                    members: [currentUser.uid],
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                });
-                setCalendarGroup({ id: ref.id, name, code, ownerUid: currentUser.uid, members: [currentUser.uid] });
-                subscribeCalEvents(ref.id);
+                try {
+                    const ref = await db.collection('calendarGroups').add({
+                        name, code, ownerUid: currentUser.uid,
+                        members: [currentUser.uid],
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    setCalendarGroup({ id: ref.id, name, code, ownerUid: currentUser.uid, members: [currentUser.uid] });
+                    subscribeCalEvents(ref.id);
+                } catch(e) {
+                    alert('그룹 생성 실패: ' + e.message);
+                }
             };
 
             const handleJoinCalendarGroup = async (code) => {
                 if (!currentUser) return;
                 if (isLocalAdmin()) { alert('로컬 어드민은 그룹 참여 불가'); return; }
-                const snap = await db.collection('calendarGroups').where('code', '==', code.toUpperCase()).limit(1).get();
-                if (snap.empty) { alert('그룹을 찾을 수 없습니다.'); return; }
-                const gDoc = snap.docs[0];
-                await db.collection('calendarGroups').doc(gDoc.id).update({
-                    members: firebase.firestore.FieldValue.arrayUnion(currentUser.uid)
-                });
-                setCalendarGroup({ id: gDoc.id, ...gDoc.data(), members: [...(gDoc.data().members || []), currentUser.uid] });
-                subscribeCalEvents(gDoc.id);
+                try {
+                    const snap = await db.collection('calendarGroups').where('code', '==', code.toUpperCase()).limit(1).get();
+                    if (snap.empty) { alert('그룹을 찾을 수 없습니다.'); return; }
+                    const gDoc = snap.docs[0];
+                    if ((gDoc.data().members || []).includes(currentUser.uid)) { alert('이미 참여한 그룹입니다.'); return; }
+                    await db.collection('calendarGroups').doc(gDoc.id).update({
+                        members: firebase.firestore.FieldValue.arrayUnion(currentUser.uid)
+                    });
+                    setCalendarGroup({ id: gDoc.id, ...gDoc.data(), members: [...(gDoc.data().members || []), currentUser.uid] });
+                    subscribeCalEvents(gDoc.id);
+                } catch(e) {
+                    alert('그룹 참여 실패: ' + e.message);
+                }
             };
 
             const handleLeaveCalendarGroup = async () => {
@@ -1027,14 +1036,18 @@
 
             const handleJoinStudyGroup = async (code) => {
                 if (isLocalAdmin()) { alert('로컬 어드민은 그룹 참여 불가'); return; }
-                const snap = await db.collection('studyGroups').where('code', '==', code.toUpperCase()).limit(1).get().catch(() => null);
-                if (!snap || snap.empty) { alert('잘못된 코드입니다.'); return; }
-                const doc = snap.docs[0];
-                if ((doc.data().members || []).includes(currentUser.uid)) { alert('이미 가입된 그룹입니다.'); return; }
-                await db.collection('studyGroups').doc(doc.id).update({
-                    members: firebase.firestore.FieldValue.arrayUnion(currentUser.uid),
-                    [`memberData.${currentUser.uid}`]: { id: currentUser.id, name: currentUser.name }
-                });
+                try {
+                    const snap = await db.collection('studyGroups').where('code', '==', code.toUpperCase()).limit(1).get();
+                    if (!snap || snap.empty) { alert('잘못된 코드입니다.'); return; }
+                    const doc = snap.docs[0];
+                    if ((doc.data().members || []).includes(currentUser.uid)) { alert('이미 가입된 그룹입니다.'); return; }
+                    await db.collection('studyGroups').doc(doc.id).update({
+                        members: firebase.firestore.FieldValue.arrayUnion(currentUser.uid),
+                        [`memberData.${currentUser.uid}`]: { id: currentUser.id, name: currentUser.name }
+                    });
+                } catch(e) {
+                    alert('그룹 참여 실패: ' + e.message);
+                }
             };
 
             const handleLeaveStudyGroup = async (groupId) => {
