@@ -812,12 +812,15 @@
                 }
             };
 
-            // 로컬 어드민 (개발용)
-            const handleAdminLogin = () => {
-                const today = new Date().toISOString().split('T')[0];
-                setCurrentUser({ uid: 'local-admin', id: 'admin', name: '관리자', school: 'HIGH.ST', role: '관리자', theme: 'light', studyTime: 0, studyDate: today, suneungDate: '2025-11-13' });
-                setUserRole('관리자');
-                setLoading(false);
+            // 관리자 로그인 (실제 Firebase Auth)
+            const handleAdminLogin = async (id, pw) => {
+                const email = `${id}@highst.app`;
+                try {
+                    await auth.signInWithEmailAndPassword(email, pw);
+                    // onAuthStateChanged가 이후 처리
+                } catch (e) {
+                    alert('로그인 실패: ' + (e.code === 'auth/wrong-password' || e.code === 'auth/user-not-found' ? 'ID 또는 비밀번호가 올바르지 않습니다' : e.message));
+                }
             };
 
             // 신규 사용자 프로필 설정 (Google 로그인 후)
@@ -4116,7 +4119,9 @@
             const [loading,     setLoading]     = useState(false);
             const [logoClicks,  setLogoClicks]  = useState(0);
             const [showAdmin,   setShowAdmin]   = useState(false);
+            const [adminId,     setAdminId]     = useState('');
             const [adminPw,     setAdminPw]     = useState('');
+            const [adminLoading,setAdminLoading]= useState(false);
 
             const clickLogo = () => {
                 const next = logoClicks + 1;
@@ -4170,14 +4175,18 @@
 
                         {/* 관리자 숨김 패널 (로고 7번 클릭) */}
                         {showAdmin && (
-                            <div style={{marginTop:'20px', paddingTop:'20px', borderTop:'1px solid rgba(255,255,255,0.08)'}}>
-                                <KorInput type="password" value={adminPw} onChange={e=>setAdminPw(e.target.value)}
-                                    onKeyDown={e=>{ if(e.key==='Enter' && adminPw==='admin1234!') onAdminLogin(); }}
-                                    placeholder="관리자 코드"
+                            <div style={{marginTop:'20px', paddingTop:'20px', borderTop:'1px solid rgba(255,255,255,0.08)', display:'flex', flexDirection:'column', gap:'8px'}}>
+                                <KorInput value={adminId} onChange={e=>setAdminId(e.target.value)}
+                                    placeholder="ID"
                                     style={{width:'100%', background:'rgba(255,255,255,0.06)', border:'1.5px solid rgba(255,255,255,0.1)', color:'#fff', borderRadius:'12px', padding:'11px 16px', fontSize:'13px', fontWeight:700, fontFamily:'Pretendard,sans-serif', outline:'none', textAlign:'center'}} />
-                                <button onClick={()=>{ if(adminPw==='admin1234!') onAdminLogin(); }}
-                                    style={{width:'100%', marginTop:'8px', padding:'11px', borderRadius:'12px', border:'none', background:'rgba(251,191,36,0.15)', color:'#fbbf24', fontWeight:800, fontSize:'12px', fontFamily:'Pretendard,sans-serif', cursor:'pointer'}}>
-                                    관리자 로그인
+                                <KorInput type="password" value={adminPw} onChange={e=>setAdminPw(e.target.value)}
+                                    onKeyDown={e=>{ if(e.key==='Enter') { setAdminLoading(true); onAdminLogin(adminId, adminPw).finally(()=>setAdminLoading(false)); } }}
+                                    placeholder="비밀번호"
+                                    style={{width:'100%', background:'rgba(255,255,255,0.06)', border:'1.5px solid rgba(255,255,255,0.1)', color:'#fff', borderRadius:'12px', padding:'11px 16px', fontSize:'13px', fontWeight:700, fontFamily:'Pretendard,sans-serif', outline:'none', textAlign:'center'}} />
+                                <button onClick={()=>{ setAdminLoading(true); onAdminLogin(adminId, adminPw).finally(()=>setAdminLoading(false)); }}
+                                    disabled={adminLoading || !adminId.trim() || !adminPw.trim()}
+                                    style={{width:'100%', padding:'11px', borderRadius:'12px', border:'none', background:'rgba(251,191,36,0.15)', color:'#fbbf24', fontWeight:800, fontSize:'12px', fontFamily:'Pretendard,sans-serif', cursor:'pointer', opacity: adminLoading ? 0.5 : 1}}>
+                                    {adminLoading ? '로그인 중...' : '관리자 로그인'}
                                 </button>
                             </div>
                         )}
