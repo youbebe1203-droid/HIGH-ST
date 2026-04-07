@@ -896,9 +896,10 @@
                     const ref = await db.collection('calendarGroups').add({
                         name, code, ownerUid: currentUser.uid,
                         members: [currentUser.uid],
+                        memberData: { [currentUser.uid]: { id: currentUser.id, name: currentUser.name } },
                         createdAt: firebase.firestore.FieldValue.serverTimestamp()
                     });
-                    setCalendarGroup({ id: ref.id, name, code, ownerUid: currentUser.uid, members: [currentUser.uid] });
+                    setCalendarGroup({ id: ref.id, name, code, ownerUid: currentUser.uid, members: [currentUser.uid], memberData: { [currentUser.uid]: { id: currentUser.id, name: currentUser.name } } });
                     subscribeCalEvents(ref.id);
                 } catch(e) {
                     alert('그룹 생성 실패: ' + e.message);
@@ -914,7 +915,8 @@
                     const gDoc = snap.docs[0];
                     if ((gDoc.data().members || []).includes(currentUser.uid)) { alert('이미 참여한 그룹입니다.'); return; }
                     await db.collection('calendarGroups').doc(gDoc.id).update({
-                        members: firebase.firestore.FieldValue.arrayUnion(currentUser.uid)
+                        members: firebase.firestore.FieldValue.arrayUnion(currentUser.uid),
+                        [`memberData.${currentUser.uid}`]: { id: currentUser.id, name: currentUser.name }
                     });
                     setCalendarGroup({ id: gDoc.id, ...gDoc.data(), members: [...(gDoc.data().members || []), currentUser.uid] });
                     subscribeCalEvents(gDoc.id);
@@ -927,7 +929,8 @@
                 if (!calendarGroup || !currentUser) return;
                 if (!isLocalAdmin()) {
                     await db.collection('calendarGroups').doc(calendarGroup.id).update({
-                        members: firebase.firestore.FieldValue.arrayRemove(currentUser.uid)
+                        members: firebase.firestore.FieldValue.arrayRemove(currentUser.uid),
+                        [`memberData.${currentUser.uid}`]: firebase.firestore.FieldValue.delete()
                     }).catch(() => {});
                 }
                 calEventsUnsub.current?.(); calEventsUnsub.current = null;
@@ -1091,7 +1094,8 @@
                     return;
                 }
                 await db.collection('calendarGroups').doc(calendarGroup.id).update({
-                    members: firebase.firestore.FieldValue.arrayRemove(targetUid)
+                    members: firebase.firestore.FieldValue.arrayRemove(targetUid),
+                    [`memberData.${targetUid}`]: firebase.firestore.FieldValue.delete()
                 }).catch(() => {});
             };
 
@@ -1741,7 +1745,7 @@
                                             <div style={{width:'8px', height:'8px', borderRadius:'50%', background:studying?'#22c55e':'var(--text-sub)', opacity:studying?1:0.2, flexShrink:0, boxShadow:studying?'0 0 8px #22c55e':'none', transition:'all 0.3s'}}></div>
                                             <div style={{flex:1, minWidth:0}}>
                                                 <div style={{fontSize:'12px', fontWeight:800, color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', display:'flex', alignItems:'center', gap:'5px'}}>
-                                                    {member.name || member.id}
+                                                    {member.name ? `${member.name}(@${member.id})` : member.id}
                                                     {isMe && <span style={{fontSize:'9px',opacity:0.4}}>나</span>}
                                                     {isOwner && <span style={{fontSize:'8px', fontWeight:900, padding:'1px 5px', borderRadius:'99px', background:'rgba(251,191,36,0.15)', color:'#f59e0b'}}>방장</span>}
                                                 </div>
@@ -1749,7 +1753,7 @@
                                             </div>
                                             {(p?.todaySeconds > 0) && <span style={{fontSize:'10px', fontWeight:800, opacity:0.4, flexShrink:0}}>{Math.floor(p.todaySeconds/60)}분</span>}
                                             {amOwner && !isMe && (
-                                                <button onClick={()=>{ if(window.confirm(`${member.name||member.id}님을 내보내시겠습니까?`)) onKickMember(group.id, uid); }}
+                                                <button onClick={()=>{ if(window.confirm(`${member.name ? `${member.name}(@${member.id})` : member.id}님을 내보내시겠습니까?`)) onKickMember(group.id, uid); }}
                                                     style={{flexShrink:0, background:'none', border:'none', cursor:'pointer', fontSize:'11px', fontWeight:800, color:'#ef4444', opacity:0.4, fontFamily:'Pretendard,sans-serif', padding:'2px 4px'}}
                                                     onMouseEnter={e=>e.currentTarget.style.opacity='1'} onMouseLeave={e=>e.currentTarget.style.opacity='0.4'}>내보내기</button>
                                             )}
@@ -2999,10 +3003,12 @@
                                     return (
                                         <div key={uid} style={{display:'flex', alignItems:'center', gap:'8px', padding:'6px 8px', borderRadius:'10px', background:'var(--glass-bg2)'}}>
                                             <div style={{width:'6px', height:'6px', borderRadius:'50%', background: isOwner ? '#f59e0b' : 'var(--accent)', flexShrink:0}}></div>
-                                            <span style={{flex:1, fontSize:'11px', fontWeight:700, color:'var(--text)', opacity:0.8}}>{uid.substring(0,8)}…{isMe?' (나)':''}</span>
+                                            {(() => { const m = calendarGroup.memberData?.[uid]; const label = m ? `${m.name}(@${m.id})` : uid.substring(0,8)+'…'; return (
+                                                <span style={{flex:1, fontSize:'11px', fontWeight:700, color:'var(--text)', opacity:0.8, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{label}{isMe?' (나)':''}</span>
+                                            ); })()}
                                             {isOwner && <span style={{fontSize:'8px', fontWeight:900, padding:'1px 5px', borderRadius:'99px', background:'rgba(251,191,36,0.15)', color:'#f59e0b'}}>방장</span>}
                                             {isCalOwner && !isMe && (
-                                                <button onClick={()=>{ if(window.confirm('이 멤버를 내보내시겠습니까?')) onKickMember(uid); }}
+                                                <button onClick={()=>{ const m = calendarGroup.memberData?.[uid]; const label = m ? `${m.name}(@${m.id})` : uid.substring(0,8); if(window.confirm(`${label}님을 내보내시겠습니까?`)) onKickMember(uid); }}
                                                     style={{background:'none', border:'none', cursor:'pointer', fontSize:'11px', fontWeight:800, color:'#ef4444', opacity:0.4, padding:'0 2px', fontFamily:'Pretendard,sans-serif'}}
                                                     onMouseEnter={e=>e.currentTarget.style.opacity='1'} onMouseLeave={e=>e.currentTarget.style.opacity='0.4'}>내보내기</button>
                                             )}
