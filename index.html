@@ -1384,32 +1384,26 @@
 
         // ─── StudyHeatmap ────────────────────────────────────────────────────
 
-        function StudyHeatmap({ heatmapData }) {
+        function StudyHeatmap({ heatmapData, subjectData = {} }) {
             const CELL = 13, GAP = 3;
             const DAYS_KR = ['일','월','화','수','목','금','토'];
+            const [tooltip, setTooltip] = useState({ visible:false, x:0, y:0, date:'', subjects:{}, total:0 });
 
             const { weeks, monthLabels } = useMemo(() => {
                 const today = new Date(); today.setHours(0,0,0,0);
-                const todayStr = today.toISOString().split('T')[0];
-                // end on nearest Saturday
                 const end = new Date(today);
                 while (end.getDay() !== 6) end.setDate(end.getDate() + 1);
-                // start 26 weeks back, on Sunday
                 const start = new Date(end);
                 start.setDate(start.getDate() - 26 * 7 + 1);
                 while (start.getDay() !== 0) start.setDate(start.getDate() - 1);
-
-                const weeks = [];
-                const monthLabels = {};
+                const weeks = [], monthLabels = {};
                 let week = [];
                 const cur = new Date(start);
-
                 while (cur <= end) {
-                    const dayOfWeek = cur.getDay();
-                    if (dayOfWeek === 0 && week.length > 0) { weeks.push(week); week = []; }
-                    const dateStr = cur.toISOString().split('T')[0];
-                    week.push(cur <= today ? dateStr : null);
-                    // month label: first week a month appears
+                    const dow = cur.getDay();
+                    if (dow === 0 && week.length > 0) { weeks.push(week); week = []; }
+                    const ds = cur.toISOString().split('T')[0];
+                    week.push(cur <= today ? ds : null);
                     if (cur.getDate() === 1) monthLabels[weeks.length] = cur.getMonth() + 1;
                     cur.setDate(cur.getDate() + 1);
                 }
@@ -1421,17 +1415,24 @@
             const getColor = (sec) => {
                 if (!sec) return null;
                 const m = sec / 60;
-                if (m < 60)  return 'rgba(79,110,247,0.20)'; // < 1h
-                if (m < 120) return 'rgba(79,110,247,0.42)'; // 1-2h
-                if (m < 240) return 'rgba(79,110,247,0.65)'; // 2-4h
-                if (m < 360) return 'rgba(79,110,247,0.82)'; // 4-6h
-                return 'rgba(79,110,247,0.97)';               // 6h+
+                if (m < 60)  return 'rgba(79,110,247,0.20)';
+                if (m < 120) return 'rgba(79,110,247,0.42)';
+                if (m < 240) return 'rgba(79,110,247,0.65)';
+                if (m < 360) return 'rgba(79,110,247,0.82)';
+                return 'rgba(79,110,247,0.97)';
+            };
+
+            const fmtSecs = (secs) => {
+                const m = Math.round(secs / 60);
+                if (m <= 0) return '0분';
+                if (m >= 60) { const h = Math.floor(m/60), r = m%60; return r ? `${h}시간 ${r}분` : `${h}시간`; }
+                return `${m}분`;
             };
 
             const todayStr = new Date().toISOString().split('T')[0];
 
             return (
-                <div className="glass-card" style={{padding:'24px 28px', marginTop:'16px', overflowX:'auto'}}>
+                <div className="glass-card" style={{padding:'24px 28px', overflowX:'auto'}}>
                     <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'16px'}}>
                         <h4 style={{fontSize:'14px', fontWeight:900, color:'var(--text)'}}>📊 학습 기록</h4>
                         <div style={{display:'flex', alignItems:'center', gap:'6px', fontSize:'10px', fontWeight:700, opacity:0.4}}>
@@ -1449,7 +1450,6 @@
                         </div>
                         {/* 주 열들 */}
                         <div style={{display:'flex', flexDirection:'column'}}>
-                            {/* 월 라벨 행 */}
                             <div style={{display:'flex', gap:`${GAP}px`, marginBottom:'4px', height:'14px'}}>
                                 {weeks.map((_,wi) => (
                                     <div key={wi} style={{width:`${CELL}px`, flexShrink:0, fontSize:'9px', fontWeight:800, color:'var(--text-sub)', opacity:monthLabels[wi]?0.45:0, whiteSpace:'nowrap'}}>
@@ -1457,7 +1457,6 @@
                                     </div>
                                 ))}
                             </div>
-                            {/* 7행 × N열 그리드 */}
                             {[0,1,2,3,4,5,6].map(dow => (
                                 <div key={dow} style={{display:'flex', gap:`${GAP}px`, marginBottom:`${GAP}px`}}>
                                     {weeks.map((week,wi) => {
@@ -1465,16 +1464,25 @@
                                         const sec = date ? (heatmapData[date] || 0) : 0;
                                         const color = getColor(sec);
                                         const isToday = date === todayStr;
-                                        const min = Math.round(sec/60);
-                                        const label = date ? (min>=60 ? `${Math.floor(min/60)}h ${min%60}m` : min>0 ? `${min}m` : '기록없음') : '';
                                         return (
-                                            <div key={wi} title={date?`${date} ${label}`:''}
+                                            <div key={wi}
                                                 style={{width:`${CELL}px`, height:`${CELL}px`, flexShrink:0, borderRadius:'3px',
                                                     background: date?(color||'var(--glass-bg2)'):'transparent',
                                                     border: isToday?'1.5px solid var(--accent)':date?'1px solid rgba(255,255,255,0.04)':'none',
-                                                    transition:'transform 0.1s', cursor:date?'default':'default'}}
-                                                onMouseEnter={e=>{if(date)e.currentTarget.style.transform='scale(1.4)';}}
-                                                onMouseLeave={e=>{e.currentTarget.style.transform='';}}
+                                                    transition:'transform 0.1s', cursor:date?'pointer':'default'}}
+                                                onMouseEnter={e=>{
+                                                    if (!date) return;
+                                                    e.currentTarget.style.transform='scale(1.4)';
+                                                    setTooltip({ visible:true, x:e.clientX+16, y:e.clientY-12, date, subjects:subjectData[date]||{}, total:sec });
+                                                }}
+                                                onMouseMove={e=>{
+                                                    if (!date) return;
+                                                    setTooltip(prev => ({ ...prev, x:e.clientX+16, y:e.clientY-12 }));
+                                                }}
+                                                onMouseLeave={e=>{
+                                                    e.currentTarget.style.transform='';
+                                                    setTooltip(prev => ({ ...prev, visible:false }));
+                                                }}
                                             />
                                         );
                                     })}
@@ -1482,6 +1490,40 @@
                             ))}
                         </div>
                     </div>
+
+                    {/* 마우스 따라가는 툴팁 (portal로 backdrop-filter 영향 방지) */}
+                    {tooltip.visible && ReactDOM.createPortal(
+                        <div style={{
+                            position:'fixed', left:tooltip.x, top:tooltip.y,
+                            pointerEvents:'none', zIndex:9999,
+                            background:'var(--bg)', border:'1px solid var(--glass-border)',
+                            borderRadius:'12px', padding:'10px 14px',
+                            boxShadow:'0 8px 32px rgba(0,0,0,0.22)',
+                            backdropFilter:'blur(24px)', WebkitBackdropFilter:'blur(24px)',
+                            minWidth:'160px',
+                        }}>
+                            <div style={{fontSize:'11px', fontWeight:900, color:'var(--accent)', marginBottom:'6px', fontFamily:'monospace', letterSpacing:'0.05em'}}>
+                                {tooltip.date}
+                            </div>
+                            {Object.keys(tooltip.subjects).length > 0 ? (<>
+                                {Object.entries(tooltip.subjects).sort((a,b)=>b[1]-a[1]).map(([subj, secs]) => (
+                                    <div key={subj} style={{display:'flex', justifyContent:'space-between', gap:'20px', fontSize:'11px', fontWeight:700, color:'var(--text)', marginBottom:'3px'}}>
+                                        <span style={{opacity:0.6}}>{subj}</span>
+                                        <span>{fmtSecs(secs)}</span>
+                                    </div>
+                                ))}
+                                {Object.keys(tooltip.subjects).length > 1 && (
+                                    <div style={{borderTop:'1px solid var(--glass-border)', marginTop:'5px', paddingTop:'5px', display:'flex', justifyContent:'space-between', fontSize:'11px', fontWeight:900}}>
+                                        <span style={{opacity:0.4}}>합계</span>
+                                        <span style={{color:'var(--accent)'}}>{fmtSecs(tooltip.total)}</span>
+                                    </div>
+                                )}
+                            </>) : (
+                                <div style={{fontSize:'10px', opacity:0.35, fontWeight:700}}>기록 없음</div>
+                            )}
+                        </div>,
+                        document.body
+                    )}
                 </div>
             );
         }
@@ -1500,6 +1542,7 @@
             const [todaySessions,  setTodaySessions]  = useState([]);
             const [groupPresence,  setGroupPresence]  = useState({});
             const [heatmapData,    setHeatmapData]    = useState({});
+            const [subjectData,    setSubjectData]    = useState({});
             const [showCreate,     setShowCreate]     = useState(false);
             const [showJoin,       setShowJoin]       = useState(false);
             const [newGroupName,   setNewGroupName]   = useState('');
@@ -1541,9 +1584,13 @@
                 db.collection('users').doc(currentUser.uid).collection('studyDays')
                     .where(firebase.firestore.FieldPath.documentId(), '>=', startStr).get()
                     .then(snap => {
-                        const data = {};
-                        snap.docs.forEach(d => { data[d.id] = d.data().seconds || 0; });
-                        setHeatmapData(data);
+                        const hd = {}, sd = {};
+                        snap.docs.forEach(d => {
+                            hd[d.id] = d.data().seconds || 0;
+                            if (d.data().subjects) sd[d.id] = d.data().subjects;
+                        });
+                        setHeatmapData(hd);
+                        setSubjectData(sd);
                     }).catch(() => {});
             }, [currentUser?.uid]);
 
@@ -1652,6 +1699,7 @@
                 const session = { id: String(Date.now()), subject: currentSubject, duration: dur, date: today, startTime: startStr };
                 setTodaySessions(prev => [session, ...prev]);
                 setHeatmapData(prev => ({ ...prev, [today]: (prev[today] || 0) + dur }));
+                setSubjectData(prev => ({ ...prev, [today]: { ...(prev[today]||{}), [currentSubject]: ((prev[today]||{})[currentSubject]||0) + dur } }));
                 setTimerSec(0);
                 await onStudyStop(currentSubject, dur, today);
             };
@@ -1664,6 +1712,7 @@
                 const session = { id: String(Date.now()), subject: forceSubject, duration: dur, date: today, startTime: startStr };
                 setTodaySessions(prev => [session, ...prev]);
                 setHeatmapData(prev => ({ ...prev, [today]: (prev[today] || 0) + dur }));
+                setSubjectData(prev => ({ ...prev, [today]: { ...(prev[today]||{}), [forceSubject]: ((prev[today]||{})[forceSubject]||0) + dur } }));
                 setForceMinutes('');
                 await onStudyStop(forceSubject, dur, today);
             };
@@ -2084,6 +2133,9 @@
                                     {todayTodos.length===0&&<div style={{textAlign:'center',padding:'32px',fontSize:'11px',fontWeight:700,opacity:0.2,textTransform:'uppercase',letterSpacing:'0.1em'}}>오늘의 목표를 추가해보세요</div>}
                                 </div>
                             </div>
+
+                            {/* ── 히트맵 (플래너와 같은 너비) ── */}
+                            <StudyHeatmap heatmapData={heatmapData} subjectData={subjectData} />
                         </div>
 
                         {/* ── 오른쪽: 공부 그룹 ── */}
@@ -2094,9 +2146,6 @@
                             <GroupPanel />
                         </div>
                     </div>
-
-                    {/* ── 히트맵 ── */}
-                    <StudyHeatmap heatmapData={heatmapData} />
                 </div>
             );
         }
