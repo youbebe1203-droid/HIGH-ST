@@ -1172,6 +1172,17 @@
             const handleDeletePost = async (postId) => {
                 if (!currentUser) return;
                 if (isLocalAdmin()) { setPosts(prev => prev.filter(p => p.id !== postId)); return; }
+                // 관리자/선생님은 바로 삭제
+                if (userRole === '관리자' || userRole === '선생님') {
+                    await db.collection('posts').doc(postId).delete()
+                        .catch(err => { console.error('[삭제 실패]', err.code, err.message); alert('삭제 실패: ' + err.message); });
+                    return;
+                }
+                // 학생: authorUid 없는 레거시 게시글이면 먼저 패치
+                const post = posts.find(p => p.id === postId);
+                if (post && !post.authorUid && post.authorId === currentUser.id) {
+                    await db.collection('posts').doc(postId).update({ authorUid: currentUser.uid }).catch(() => {});
+                }
                 await db.collection('posts').doc(postId).delete()
                     .catch(err => { console.error('[삭제 실패]', err.code, err.message); alert('삭제 실패: ' + err.message); });
             };
@@ -2418,7 +2429,7 @@
                 const isLiked     = (livePost.likedBy    || []).includes(uid);
                 const isDisliked  = (livePost.dislikedBy || []).includes(uid);
                 const isReported  = (livePost.reportedBy || []).includes(uid);
-                const canDelete = userRole === '관리자' || livePost.authorId === currentUser?.id;
+                const canDelete = userRole === '관리자' || userRole === '선생님' || livePost.authorId === currentUser?.id;
                 return (
                 <div className="anim-fade-up" style={{maxWidth:'760px', margin:'0 auto'}}>
                     <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'16px'}}>
