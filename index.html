@@ -1108,7 +1108,8 @@
                     authorName: currentUser.name,
                     date: now.toLocaleDateString('ko-KR'),
                     time: now.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
-                    views: 0, likes: 0,
+                    views: 0, likes: 0, dislikes: 0,
+                    likedBy: [], dislikedBy: [], reportedBy: [], commentCount: 0,
                     createdAt: now.toISOString(),
                 };
                 if (isLocalAdmin()) {
@@ -1119,6 +1120,49 @@
                     ...newPost,
                     createdAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
+            };
+
+            const handleLikePost = async (postId, type) => {
+                if (!currentUser?.uid || isLocalAdmin()) return;
+                const post = posts.find(p => p.id === postId);
+                if (!post) return;
+                const uid = currentUser.uid;
+                const liked = (post.likedBy || []).includes(uid);
+                const disliked = (post.dislikedBy || []).includes(uid);
+                const upd = {};
+                if (type === 'like') {
+                    if (liked) {
+                        upd.likes = firebase.firestore.FieldValue.increment(-1);
+                        upd.likedBy = firebase.firestore.FieldValue.arrayRemove(uid);
+                    } else {
+                        upd.likes = firebase.firestore.FieldValue.increment(1);
+                        upd.likedBy = firebase.firestore.FieldValue.arrayUnion(uid);
+                        if (disliked) {
+                            upd.dislikes = firebase.firestore.FieldValue.increment(-1);
+                            upd.dislikedBy = firebase.firestore.FieldValue.arrayRemove(uid);
+                        }
+                    }
+                } else {
+                    if (disliked) {
+                        upd.dislikes = firebase.firestore.FieldValue.increment(-1);
+                        upd.dislikedBy = firebase.firestore.FieldValue.arrayRemove(uid);
+                    } else {
+                        upd.dislikes = firebase.firestore.FieldValue.increment(1);
+                        upd.dislikedBy = firebase.firestore.FieldValue.arrayUnion(uid);
+                        if (liked) {
+                            upd.likes = firebase.firestore.FieldValue.increment(-1);
+                            upd.likedBy = firebase.firestore.FieldValue.arrayRemove(uid);
+                        }
+                    }
+                }
+                await db.collection('posts').doc(postId).update(upd).catch(() => {});
+            };
+
+            const handleReportPost = async (postId) => {
+                if (!currentUser?.uid || isLocalAdmin()) return;
+                await db.collection('posts').doc(postId).update({
+                    reportedBy: firebase.firestore.FieldValue.arrayUnion(currentUser.uid)
+                }).catch(() => {});
             };
 
             // ── 메시지(대화방) 핸들러 ────────────────────────────────────────
@@ -1211,7 +1255,7 @@
                 {view === '학습'     && <StudyView currentUser={currentUser} studyGroups={studyGroups} studyTime={studyTime} suneungDate={suneungDate} getDDay={getDDay} todos={todos} selectedDate={selectedDate} setSelectedDate={setSelectedDate} onAddTodo={handleAddTodo} onToggleTodo={handleToggleTodo} onDeleteTodo={handleDeleteTodo} onStudyStart={handleStudyStart} onStudyStop={handleStudyStop} onCreateGroup={handleCreateStudyGroup} onJoinGroup={handleJoinStudyGroup} onLeaveGroup={handleLeaveStudyGroup} onKickMember={handleKickStudyMember} isMobileUI={isMobileUI} />}
                 {view === '플래너'   && <Planner todos={todos} selectedDate={selectedDate} setSelectedDate={setSelectedDate} onAdd={handleAddTodo} onToggle={handleToggleTodo} onDelete={handleDeleteTodo} />}
                 {view === '공지사항' && <NoticeView isAdmin={canManageSystem} announcements={announcements} onAdd={handleAddAnnouncement} />}
-                {view === '커뮤니티' && <CommunityView posts={posts} currentUser={currentUser} onAddPost={handleAddPost} />}
+                {view === '커뮤니티' && <CommunityView posts={posts} currentUser={currentUser} onAddPost={handleAddPost} onLike={handleLikePost} onReport={handleReportPost} />}
                 {view === '공용달력' && <CalendarView calendarGroup={calendarGroup} calendarEvents={calendarEvents} onCreateGroup={handleCreateCalendarGroup} onJoinGroup={handleJoinCalendarGroup} onLeaveGroup={handleLeaveCalendarGroup} onAddEvent={handleAddCalendarEvent} onDeleteEvent={handleDeleteCalendarEvent} onKickMember={handleKickCalendarMember} isMobileUI={isMobileUI} currentUser={currentUser} userRole={userRole} />}
                 {view === '자료실'   && <ResourceView resources={resources} currentUser={currentUser} onAdd={handleAddResource} />}
                 {view === '메시지'   && <MessageView rooms={rooms} currentUser={currentUser} localRoomMessages={localRoomMessages} onCreateRoom={handleCreateRoom} onSendInRoom={handleSendInRoom} isMobileUI={isMobileUI} />}
@@ -2265,7 +2309,7 @@
         const CATEGORIES = ['전체','공부','질문','잡담','기타'];
         const CAT_ICON   = { '공부':'📖', '질문':'❓', '잡담':'💬', '기타':'📝' };
 
-        function CommunityView({ posts, currentUser, onAddPost }) {
+        function CommunityView({ posts, currentUser, onAddPost, onLike, onReport }) {
             const [mode, setMode]                 = useState('list');   // 'list' | 'write' | 'detail'
             const [selectedPost, setSelectedPost] = useState(null);
             const [filterCat, setFilterCat]       = useState('전체');
@@ -2337,7 +2381,9 @@
                         content: commentInput.trim(),
                         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                     }).catch(() => {});
-                    // onSnapshot이 자동으로 comments 업데이트
+                    await db.collection('posts').doc(selectedPost.id).update({
+                        commentCount: firebase.firestore.FieldValue.increment(1)
+                    }).catch(() => {});
                 }
                 setCommentInput('');
                 setCommentLoading(false);
@@ -2348,7 +2394,14 @@
             const filteredPosts = filterCat === '전체' ? posts : posts.filter(p => p.category === filterCat);
 
             /* ── Detail ── */
-            if (mode === 'detail' && selectedPost) return (
+            if (mode === 'detail' && selectedPost) {
+                // onSnapshot으로 실시간 반영된 최신 포스트 데이터 사용
+                const livePost = posts.find(p => p.id === selectedPost.id) || selectedPost;
+                const uid = currentUser?.uid;
+                const isLiked     = (livePost.likedBy    || []).includes(uid);
+                const isDisliked  = (livePost.dislikedBy || []).includes(uid);
+                const isReported  = (livePost.reportedBy || []).includes(uid);
+                return (
                 <div className="anim-fade-up" style={{maxWidth:'760px', margin:'0 auto'}}>
                     <button onClick={()=>setMode('list')} style={{background:'none', border:'none', cursor:'pointer', color:'var(--accent)', fontWeight:800, fontSize:'13px', fontFamily:'Pretendard,sans-serif', marginBottom:'16px', padding:'0', display:'flex', alignItems:'center', gap:'6px'}}>
                         ← 목록으로
@@ -2358,15 +2411,54 @@
                     <div className="glass-card-lg" style={{padding:'32px 36px', marginBottom:'16px'}}>
                         <div style={{display:'flex', alignItems:'center', gap:'10px', marginBottom:'20px'}}>
                             <span style={{padding:'4px 12px', borderRadius:'99px', background:'rgba(79,110,247,0.15)', border:'1px solid rgba(79,110,247,0.3)', fontSize:'11px', fontWeight:800, color:'var(--accent)'}}>
-                                {CAT_ICON[selectedPost.category] || '📝'} {selectedPost.category}
+                                {CAT_ICON[livePost.category] || '📝'} {livePost.category}
                             </span>
                         </div>
-                        <h2 style={{fontSize:'22px', fontWeight:900, color:'var(--text)', letterSpacing:'-0.3px', marginBottom:'12px', lineHeight:1.35}}>{selectedPost.title}</h2>
+                        <h2 style={{fontSize:'22px', fontWeight:900, color:'var(--text)', letterSpacing:'-0.3px', marginBottom:'12px', lineHeight:1.35}}>{livePost.title}</h2>
                         <div style={{display:'flex', gap:'16px', marginBottom:'28px', paddingBottom:'20px', borderBottom:'1px solid var(--glass-border)'}}>
-                            <span style={{fontSize:'11px', fontWeight:700, opacity:0.45}}>{selectedPost.authorName}</span>
-                            <span style={{fontSize:'11px', fontWeight:700, opacity:0.35}}>{selectedPost.date} {selectedPost.time}</span>
+                            <span style={{fontSize:'11px', fontWeight:700, opacity:0.45}}>{livePost.authorName}</span>
+                            <span style={{fontSize:'11px', fontWeight:700, opacity:0.35}}>{livePost.date} {livePost.time}</span>
                         </div>
-                        <p style={{fontSize:'15px', fontWeight:600, lineHeight:1.8, color:'var(--text)', opacity:0.85, whiteSpace:'pre-wrap'}}>{selectedPost.content}</p>
+                        <p style={{fontSize:'15px', fontWeight:600, lineHeight:1.8, color:'var(--text)', opacity:0.85, whiteSpace:'pre-wrap'}}>{livePost.content}</p>
+
+                        {/* 반응 버튼 */}
+                        <div style={{display:'flex', gap:'8px', marginTop:'28px', paddingTop:'20px', borderTop:'1px solid var(--glass-border)', alignItems:'center'}}>
+                            {/* 좋아요 */}
+                            <button onClick={()=>onLike(livePost.id,'like')}
+                                style={{display:'flex', alignItems:'center', gap:'6px', padding:'8px 18px', borderRadius:'99px',
+                                    border: isLiked ? '2px solid var(--accent)' : '1.5px solid var(--glass-border)',
+                                    background: isLiked ? 'rgba(79,110,247,0.15)' : 'var(--glass-bg2)',
+                                    cursor:'pointer', fontSize:'13px', fontWeight:800,
+                                    color: isLiked ? 'var(--accent)' : 'var(--text-sub)',
+                                    fontFamily:'Pretendard,sans-serif', transition:'all 0.15s'}}>
+                                👍 <span>{livePost.likes || 0}</span>
+                            </button>
+                            {/* 싫어요 */}
+                            <button onClick={()=>onLike(livePost.id,'dislike')}
+                                style={{display:'flex', alignItems:'center', gap:'6px', padding:'8px 18px', borderRadius:'99px',
+                                    border: isDisliked ? '2px solid #ef4444' : '1.5px solid var(--glass-border)',
+                                    background: isDisliked ? 'rgba(239,68,68,0.12)' : 'var(--glass-bg2)',
+                                    cursor:'pointer', fontSize:'13px', fontWeight:800,
+                                    color: isDisliked ? '#ef4444' : 'var(--text-sub)',
+                                    fontFamily:'Pretendard,sans-serif', transition:'all 0.15s'}}>
+                                👎 <span>{livePost.dislikes || 0}</span>
+                            </button>
+                            <div style={{flex:1}} />
+                            {/* 신고 */}
+                            {isReported ? (
+                                <span style={{fontSize:'11px', fontWeight:700, opacity:0.35}}>신고됨</span>
+                            ) : livePost.authorId !== currentUser?.id && (
+                                <button onClick={()=>{ if(window.confirm('이 게시글을 신고하시겠습니까?')) onReport(livePost.id); }}
+                                    style={{display:'flex', alignItems:'center', gap:'4px', padding:'7px 14px', borderRadius:'99px',
+                                        border:'1.5px solid var(--glass-border)', background:'var(--glass-bg2)',
+                                        cursor:'pointer', fontSize:'11px', fontWeight:800, color:'var(--text-sub)',
+                                        fontFamily:'Pretendard,sans-serif', opacity:0.6, transition:'opacity 0.15s'}}
+                                    onMouseEnter={e=>e.currentTarget.style.opacity='1'}
+                                    onMouseLeave={e=>e.currentTarget.style.opacity='0.6'}>
+                                    🚨 신고
+                                </button>
+                            )}
+                        </div>
                     </div>
 
                     {/* 댓글 섹션 */}
@@ -2422,7 +2514,8 @@
                         </div>
                     </div>
                 </div>
-            );
+                );
+            }
 
             /* ── Write ── */
             if (mode === 'write') return (
@@ -2516,9 +2609,20 @@
                                         </div>
                                         <div style={{fontSize:'15px', fontWeight:800, color:'var(--text)', marginBottom:'6px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{p.title}</div>
                                         <div style={{fontSize:'12px', fontWeight:600, opacity:0.5, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', lineHeight:1.5}}>{p.content}</div>
-                                        <div style={{display:'flex', gap:'12px', marginTop:'10px'}}>
+                                        <div style={{display:'flex', gap:'12px', marginTop:'10px', alignItems:'center'}}>
                                             <span style={{fontSize:'10px', fontWeight:700, opacity:0.4}}>{p.authorName}</span>
                                             <span style={{fontSize:'10px', fontWeight:700, opacity:0.3}}>{p.date}</span>
+                                            <div style={{display:'flex', gap:'10px', marginLeft:'auto', alignItems:'center'}}>
+                                                {(p.commentCount > 0) && <span style={{fontSize:'10px', fontWeight:800, opacity:0.45}}>💬 {p.commentCount}</span>}
+                                                <span onClick={e=>{ e.stopPropagation(); onLike(p.id,'like'); }}
+                                                    style={{fontSize:'10px', fontWeight:800, cursor:'pointer', color:(p.likedBy||[]).includes(currentUser?.uid)?'var(--accent)':'var(--text-sub)', opacity:(p.likedBy||[]).includes(currentUser?.uid)?1:0.45, transition:'all 0.15s'}}>
+                                                    👍 {p.likes || 0}
+                                                </span>
+                                                <span onClick={e=>{ e.stopPropagation(); onLike(p.id,'dislike'); }}
+                                                    style={{fontSize:'10px', fontWeight:800, cursor:'pointer', color:(p.dislikedBy||[]).includes(currentUser?.uid)?'#ef4444':'var(--text-sub)', opacity:(p.dislikedBy||[]).includes(currentUser?.uid)?1:0.45, transition:'all 0.15s'}}>
+                                                    👎 {p.dislikes || 0}
+                                                </span>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
