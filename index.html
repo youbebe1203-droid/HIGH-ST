@@ -1745,7 +1745,7 @@
                                             <div style={{width:'8px', height:'8px', borderRadius:'50%', background:studying?'#22c55e':'var(--text-sub)', opacity:studying?1:0.2, flexShrink:0, boxShadow:studying?'0 0 8px #22c55e':'none', transition:'all 0.3s'}}></div>
                                             <div style={{flex:1, minWidth:0}}>
                                                 <div style={{fontSize:'12px', fontWeight:800, color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', display:'flex', alignItems:'center', gap:'5px'}}>
-                                                    {member.name ? `${member.name}(@${member.id})` : member.id}
+                                                    {member.name ? <>{member.name}<span style={{opacity:0.35, fontWeight:700}}> (@{member.id})</span></> : member.id}
                                                     {isMe && <span style={{fontSize:'9px',opacity:0.4}}>나</span>}
                                                     {isOwner && <span style={{fontSize:'8px', fontWeight:900, padding:'1px 5px', borderRadius:'99px', background:'rgba(251,191,36,0.15)', color:'#f59e0b'}}>방장</span>}
                                                 </div>
@@ -3003,8 +3003,10 @@
                                     return (
                                         <div key={uid} style={{display:'flex', alignItems:'center', gap:'8px', padding:'6px 8px', borderRadius:'10px', background:'var(--glass-bg2)'}}>
                                             <div style={{width:'6px', height:'6px', borderRadius:'50%', background: isOwner ? '#f59e0b' : 'var(--accent)', flexShrink:0}}></div>
-                                            {(() => { const m = calendarGroup.memberData?.[uid]; const label = m ? `${m.name}(@${m.id})` : uid.substring(0,8)+'…'; return (
-                                                <span style={{flex:1, fontSize:'11px', fontWeight:700, color:'var(--text)', opacity:0.8, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{label}{isMe?' (나)':''}</span>
+                                            {(() => { const m = calendarGroup.memberData?.[uid]; return (
+                                                <span style={{flex:1, fontSize:'11px', fontWeight:700, color:'var(--text)', opacity:0.8, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>
+                                                    {m ? <>{m.name}<span style={{opacity:0.45, fontWeight:700}}> (@{m.id})</span></> : uid.substring(0,8)+'…'}{isMe?' (나)':''}
+                                                </span>
                                             ); })()}
                                             {isOwner && <span style={{fontSize:'8px', fontWeight:900, padding:'1px 5px', borderRadius:'99px', background:'rgba(251,191,36,0.15)', color:'#f59e0b'}}>방장</span>}
                                             {isCalOwner && !isMe && (
