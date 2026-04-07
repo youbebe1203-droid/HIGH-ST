@@ -698,6 +698,7 @@
                         unsubRefs.current.forEach(u => u());
                         unsubRefs.current = [];
                         calEventsUnsub.current?.(); calEventsUnsub.current = null;
+                        calGroupUnsub.current?.(); calGroupUnsub.current = null;
                         setCurrentUser(null);
                         setNeedsSetup(null);
                         setTodos([]); setResources([]); setAnnouncements([]);
@@ -868,11 +869,20 @@
             };
 
             // ── 달력 그룹 핸들러 ─────────────────────────────────────────────
+            const calGroupUnsub = React.useRef(null);
+
             const subscribeCalEvents = (groupId) => {
                 calEventsUnsub.current?.();
+                calGroupUnsub.current?.();
                 calEventsUnsub.current = db.collection('calendarGroups').doc(groupId)
                     .collection('events')
                     .onSnapshot(snap => setCalendarEvents(snap.docs.map(d => ({ id: d.id, ...d.data() }))), () => {});
+                // 그룹 문서 실시간 구독 (멤버 입출 반영)
+                calGroupUnsub.current = db.collection('calendarGroups').doc(groupId)
+                    .onSnapshot(snap => {
+                        if (snap.exists) setCalendarGroup({ id: snap.id, ...snap.data() });
+                        else { setCalendarGroup(null); setCalendarEvents([]); }
+                    }, () => {});
             };
 
             const handleCreateCalendarGroup = async (name) => {
@@ -921,15 +931,16 @@
                     }).catch(() => {});
                 }
                 calEventsUnsub.current?.(); calEventsUnsub.current = null;
+                calGroupUnsub.current?.(); calGroupUnsub.current = null;
                 setCalendarGroup(null); setCalendarEvents([]);
             };
 
-            const handleAddCalendarEvent = async (day, month, year, text) => {
+            const handleAddCalendarEvent = async (day, month, year, text, endDay) => {
                 if (!calendarGroup) return;
-                const newEvent = { id: String(Date.now()), day, month, year, text };
-                if (isLocalAdmin()) { setCalendarEvents(prev => [...prev, newEvent]); return; }
+                const data = { day, month, year, text, ...(endDay && endDay > day ? { endDay } : {}) };
+                if (isLocalAdmin()) { setCalendarEvents(prev => [...prev, { id: String(Date.now()), ...data }]); return; }
                 await db.collection('calendarGroups').doc(calendarGroup.id).collection('events').add({
-                    day, month, year, text, authorUid: currentUser.uid,
+                    ...data, authorUid: currentUser.uid,
                     createdAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
             };
@@ -1024,11 +1035,11 @@
             const handleCreateStudyGroup = async (name) => {
                 const code = Math.random().toString(36).substring(2, 8).toUpperCase();
                 if (isLocalAdmin()) {
-                    setStudyGroups(prev => [...prev, { id: `local-${Date.now()}`, name, code, members: [currentUser.uid], memberData: { [currentUser.uid]: { id: currentUser.id, name: currentUser.name } } }]);
+                    setStudyGroups(prev => [...prev, { id: `local-${Date.now()}`, name, code, ownerUid: currentUser.uid, members: [currentUser.uid], memberData: { [currentUser.uid]: { id: currentUser.id, name: currentUser.name } } }]);
                     return;
                 }
                 await db.collection('studyGroups').add({
-                    name, code, members: [currentUser.uid],
+                    name, code, ownerUid: currentUser.uid, members: [currentUser.uid],
                     memberData: { [currentUser.uid]: { id: currentUser.id, name: currentUser.name } },
                     createdAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
@@ -1053,7 +1064,34 @@
             const handleLeaveStudyGroup = async (groupId) => {
                 if (isLocalAdmin()) { setStudyGroups(prev => prev.filter(g => g.id !== groupId)); return; }
                 await db.collection('studyGroups').doc(groupId).update({
-                    members: firebase.firestore.FieldValue.arrayRemove(currentUser.uid)
+                    members: firebase.firestore.FieldValue.arrayRemove(currentUser.uid),
+                    [`memberData.${currentUser.uid}`]: firebase.firestore.FieldValue.delete()
+                }).catch(() => {});
+            };
+
+            const handleKickStudyMember = async (groupId, targetUid) => {
+                if (isLocalAdmin()) {
+                    setStudyGroups(prev => prev.map(g => g.id !== groupId ? g : {
+                        ...g,
+                        members: g.members.filter(m => m !== targetUid),
+                        memberData: Object.fromEntries(Object.entries(g.memberData||{}).filter(([k]) => k !== targetUid))
+                    }));
+                    return;
+                }
+                await db.collection('studyGroups').doc(groupId).update({
+                    members: firebase.firestore.FieldValue.arrayRemove(targetUid),
+                    [`memberData.${targetUid}`]: firebase.firestore.FieldValue.delete()
+                }).catch(() => {});
+            };
+
+            const handleKickCalendarMember = async (targetUid) => {
+                if (!calendarGroup) return;
+                if (isLocalAdmin()) {
+                    setCalendarGroup(prev => ({ ...prev, members: (prev.members||[]).filter(m => m !== targetUid) }));
+                    return;
+                }
+                await db.collection('calendarGroups').doc(calendarGroup.id).update({
+                    members: firebase.firestore.FieldValue.arrayRemove(targetUid)
                 }).catch(() => {});
             };
 
@@ -1166,11 +1204,11 @@
             // ── 공통 뷰 렌더러 ──────────────────────────────────────────────
             const renderView = () => (<>
                 {view === '대시보드' && <Dashboard announcements={announcements} todos={todos} resources={resources} posts={posts} studyTime={studyTime} suneungDate={suneungDate} getDDay={getDDay} setView={setView} currentUser={currentUser} />}
-                {view === '학습'     && <StudyView currentUser={currentUser} studyGroups={studyGroups} studyTime={studyTime} suneungDate={suneungDate} getDDay={getDDay} todos={todos} selectedDate={selectedDate} setSelectedDate={setSelectedDate} onAddTodo={handleAddTodo} onToggleTodo={handleToggleTodo} onDeleteTodo={handleDeleteTodo} onStudyStart={handleStudyStart} onStudyStop={handleStudyStop} onCreateGroup={handleCreateStudyGroup} onJoinGroup={handleJoinStudyGroup} onLeaveGroup={handleLeaveStudyGroup} isMobileUI={isMobileUI} />}
+                {view === '학습'     && <StudyView currentUser={currentUser} studyGroups={studyGroups} studyTime={studyTime} suneungDate={suneungDate} getDDay={getDDay} todos={todos} selectedDate={selectedDate} setSelectedDate={setSelectedDate} onAddTodo={handleAddTodo} onToggleTodo={handleToggleTodo} onDeleteTodo={handleDeleteTodo} onStudyStart={handleStudyStart} onStudyStop={handleStudyStop} onCreateGroup={handleCreateStudyGroup} onJoinGroup={handleJoinStudyGroup} onLeaveGroup={handleLeaveStudyGroup} onKickMember={handleKickStudyMember} isMobileUI={isMobileUI} />}
                 {view === '플래너'   && <Planner todos={todos} selectedDate={selectedDate} setSelectedDate={setSelectedDate} onAdd={handleAddTodo} onToggle={handleToggleTodo} onDelete={handleDeleteTodo} />}
                 {view === '공지사항' && <NoticeView isAdmin={canManageSystem} announcements={announcements} onAdd={handleAddAnnouncement} />}
                 {view === '커뮤니티' && <CommunityView posts={posts} currentUser={currentUser} onAddPost={handleAddPost} />}
-                {view === '공용달력' && <CalendarView calendarGroup={calendarGroup} calendarEvents={calendarEvents} onCreateGroup={handleCreateCalendarGroup} onJoinGroup={handleJoinCalendarGroup} onLeaveGroup={handleLeaveCalendarGroup} onAddEvent={handleAddCalendarEvent} onDeleteEvent={handleDeleteCalendarEvent} isMobileUI={isMobileUI} currentUser={currentUser} />}
+                {view === '공용달력' && <CalendarView calendarGroup={calendarGroup} calendarEvents={calendarEvents} onCreateGroup={handleCreateCalendarGroup} onJoinGroup={handleJoinCalendarGroup} onLeaveGroup={handleLeaveCalendarGroup} onAddEvent={handleAddCalendarEvent} onDeleteEvent={handleDeleteCalendarEvent} onKickMember={handleKickCalendarMember} isMobileUI={isMobileUI} currentUser={currentUser} userRole={userRole} />}
                 {view === '자료실'   && <ResourceView resources={resources} currentUser={currentUser} onAdd={handleAddResource} />}
                 {view === '메시지'   && <MessageView rooms={rooms} currentUser={currentUser} localRoomMessages={localRoomMessages} onCreateRoom={handleCreateRoom} onSendInRoom={handleSendInRoom} isMobileUI={isMobileUI} />}
                 {view === '설정'     && <SettingsView currentUser={currentUser} userRole={userRole} theme={theme} suneungDate={suneungDate} getDDay={getDDay} onThemeChange={async (t) => { setTheme(t); await saveProfile({ theme: t }); }} onRoleChange={async (r) => { setUserRole(r); await saveProfile({ role: r }); }} onSuneungChange={async (d) => { setSuneungDate(d); await saveProfile({ suneungDate: d }); }} onSchoolChange={async (s) => await saveProfile({ school: s })} onNameChange={async (n) => { await saveProfile({ name: n }); }} />}
@@ -1446,7 +1484,7 @@
 
         // ─── StudyView ───────────────────────────────────────────────────────
 
-        function StudyView({ currentUser, studyGroups, studyTime, suneungDate, getDDay, todos, selectedDate, setSelectedDate, onAddTodo, onToggleTodo, onDeleteTodo, onStudyStart, onStudyStop, onCreateGroup, onJoinGroup, onLeaveGroup, isMobileUI }) {
+        function StudyView({ currentUser, studyGroups, studyTime, suneungDate, getDDay, todos, selectedDate, setSelectedDate, onAddTodo, onToggleTodo, onDeleteTodo, onStudyStart, onStudyStop, onCreateGroup, onJoinGroup, onLeaveGroup, onKickMember, isMobileUI }) {
             const [isTimerOn,      setIsTimerOn]      = useState(false);
             const [isPaused,       setIsPaused]       = useState(false);
             const [isStopping,     setIsStopping]     = useState(false);
@@ -1678,7 +1716,10 @@
                         <div key={group.id} className="glass-card" style={{padding:'18px', marginBottom:'8px'}}>
                             <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:'4px'}}>
                                 <div>
-                                    <div style={{fontSize:'14px', fontWeight:900, color:'var(--text)'}}>{group.name}</div>
+                                    <div style={{display:'flex', alignItems:'center', gap:'8px'}}>
+                                        <div style={{fontSize:'14px', fontWeight:900, color:'var(--text)'}}>{group.name}</div>
+                                        {group.ownerUid === currentUser?.uid && <span style={{fontSize:'9px', fontWeight:900, padding:'2px 7px', borderRadius:'99px', background:'rgba(251,191,36,0.15)', color:'#f59e0b', border:'1px solid rgba(251,191,36,0.3)'}}>방장</span>}
+                                    </div>
                                     <div style={{display:'flex', alignItems:'center', gap:'8px', marginTop:'4px'}}>
                                         <span style={{fontSize:'10px', fontWeight:800, color:'var(--accent)', fontFamily:'monospace', letterSpacing:'0.15em'}}>코드: {group.code}</span>
                                         {studyingCount > 0 && <span style={{fontSize:'10px', fontWeight:800, color:'#22c55e'}}>🟢 {studyingCount}명 공부 중</span>}
@@ -1693,14 +1734,25 @@
                                     const studying = p?.isStudying;
                                     const sc = allSubjects.find(s => s.id === p?.subject);
                                     const isMe = uid === currentUser?.uid;
+                                    const isOwner = uid === group.ownerUid;
+                                    const amOwner = currentUser?.uid === group.ownerUid;
                                     return (
                                         <div key={uid} style={{display:'flex', alignItems:'center', gap:'10px', padding:'8px 10px', borderRadius:'12px', background:'var(--glass-bg2)', border: isMe ? '1px solid rgba(79,110,247,0.2)' : 'none'}}>
                                             <div style={{width:'8px', height:'8px', borderRadius:'50%', background:studying?'#22c55e':'var(--text-sub)', opacity:studying?1:0.2, flexShrink:0, boxShadow:studying?'0 0 8px #22c55e':'none', transition:'all 0.3s'}}></div>
                                             <div style={{flex:1, minWidth:0}}>
-                                                <div style={{fontSize:'12px', fontWeight:800, color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{member.name || member.id}{isMe&&<span style={{fontSize:'9px',opacity:0.4,marginLeft:'5px'}}>나</span>}</div>
+                                                <div style={{fontSize:'12px', fontWeight:800, color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', display:'flex', alignItems:'center', gap:'5px'}}>
+                                                    {member.name || member.id}
+                                                    {isMe && <span style={{fontSize:'9px',opacity:0.4}}>나</span>}
+                                                    {isOwner && <span style={{fontSize:'8px', fontWeight:900, padding:'1px 5px', borderRadius:'99px', background:'rgba(251,191,36,0.15)', color:'#f59e0b'}}>방장</span>}
+                                                </div>
                                                 {studying && p.subject && <div style={{fontSize:'10px', fontWeight:700, color:sc?.color||'var(--accent)', marginTop:'1px'}}>{p.subject} 공부 중</div>}
                                             </div>
                                             {(p?.todaySeconds > 0) && <span style={{fontSize:'10px', fontWeight:800, opacity:0.4, flexShrink:0}}>{Math.floor(p.todaySeconds/60)}분</span>}
+                                            {amOwner && !isMe && (
+                                                <button onClick={()=>{ if(window.confirm(`${member.name||member.id}님을 내보내시겠습니까?`)) onKickMember(group.id, uid); }}
+                                                    style={{flexShrink:0, background:'none', border:'none', cursor:'pointer', fontSize:'11px', fontWeight:800, color:'#ef4444', opacity:0.4, fontFamily:'Pretendard,sans-serif', padding:'2px 4px'}}
+                                                    onMouseEnter={e=>e.currentTarget.style.opacity='1'} onMouseLeave={e=>e.currentTarget.style.opacity='0.4'}>내보내기</button>
+                                            )}
                                         </div>
                                     );
                                 })}
@@ -2565,7 +2617,7 @@
 
         // ─── CalendarView ────────────────────────────────────────────────────
 
-        function CalendarView({ calendarGroup, calendarEvents, onCreateGroup, onJoinGroup, onLeaveGroup, onAddEvent, onDeleteEvent, isMobileUI, currentUser }) {
+        function CalendarView({ calendarGroup, calendarEvents, onCreateGroup, onJoinGroup, onLeaveGroup, onAddEvent, onDeleteEvent, onKickMember, isMobileUI, currentUser, userRole }) {
             const now = new Date();
             const year = now.getFullYear(); const month = now.getMonth();
             const days = useMemo(() => {
@@ -2579,6 +2631,7 @@
 
             const [addingDay,    setAddingDay]    = useState(null);
             const [eventText,    setEventText]    = useState('');
+            const [eventEndDay,  setEventEndDay]  = useState('');
             const [saving,       setSaving]       = useState(false);
             // 그룹 관련 상태
             const [groupView,    setGroupView]    = useState('none'); // 'none'|'create'|'join'
@@ -2587,15 +2640,25 @@
             const [groupLoading, setGroupLoading] = useState(false);
             const [showGroupInfo, setShowGroupInfo] = useState(false); // 모바일: 그룹 정보 시트
 
+            // 일정 추가/삭제 권한: 방장 또는 선생님/관리자
+            const isCalAdmin = calendarGroup && (
+                calendarGroup.ownerUid === currentUser?.uid ||
+                userRole === '선생님' || userRole === '관리자'
+            );
+            // 방장 여부 (멤버 내보내기용)
+            const isCalOwner = calendarGroup?.ownerUid === currentUser?.uid;
+
             const clickDay = (day) => {
                 if (!calendarGroup || !day) return;
-                setAddingDay(d => d === day ? null : day); setEventText('');
+                setAddingDay(d => d === day ? null : day);
+                setEventText(''); setEventEndDay('');
             };
             const confirmEvent = async () => {
                 if (!eventText.trim()) return;
                 setSaving(true);
-                await onAddEvent(addingDay, month, year, eventText.trim());
-                setSaving(false); setAddingDay(null); setEventText('');
+                const endD = parseInt(eventEndDay);
+                await onAddEvent(addingDay, month, year, eventText.trim(), (!isNaN(endD) && endD > addingDay) ? endD : null);
+                setSaving(false); setAddingDay(null); setEventText(''); setEventEndDay('');
             };
 
             const createGroup = async () => {
@@ -2626,7 +2689,7 @@
                     <div style={{display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:`${gap}px`}}>
                         {days.map((d, i) => {
                             const isToday = d === now.getDate();
-                            const events  = d ? calendarEvents.filter(e => e.day === d && e.month === month && e.year === year) : [];
+                            const events  = d ? calendarEvents.filter(e => e.month === month && e.year === year && d >= e.day && d <= (e.endDay || e.day)) : [];
                             const isSelected = addingDay === d;
                             return (
                                 <div key={i}
@@ -2669,28 +2732,43 @@
                                 <button onClick={()=>setAddingDay(null)} style={{background:'none',border:'none',cursor:'pointer',fontSize:'18px',color:'var(--text-sub)',opacity:0.4,lineHeight:1}}>×</button>
                             </div>
                             {(() => {
-                                const dayEvts = calendarEvents.filter(e => e.day === addingDay && e.month === month && e.year === year);
+                                const dayEvts = calendarEvents.filter(e => e.month === month && e.year === year && addingDay >= e.day && addingDay <= (e.endDay || e.day));
                                 return dayEvts.length > 0 ? (
                                     <div style={{display:'flex', flexDirection:'column', gap:'6px', marginBottom:'10px'}}>
                                         {dayEvts.map((e, idx) => (
                                             <div key={idx} style={{display:'flex', alignItems:'center', justifyContent:'space-between', padding:'8px 12px', borderRadius:'10px', background:'rgba(79,110,247,0.08)', border:'1px solid rgba(79,110,247,0.18)'}}>
-                                                <span style={{fontSize:'13px', fontWeight:700, color:'var(--text)'}}>{e.text}</span>
-                                                <button onClick={()=>onDeleteEvent(e.id)} style={{background:'none',border:'none',cursor:'pointer',fontSize:'16px',color:'#ef4444',opacity:0.5,lineHeight:1}}
-                                                    onMouseEnter={ev=>ev.currentTarget.style.opacity='1'} onMouseLeave={ev=>ev.currentTarget.style.opacity='0.5'}>×</button>
+                                                <div style={{flex:1, minWidth:0}}>
+                                                    <span style={{fontSize:'13px', fontWeight:700, color:'var(--text)'}}>{e.text}</span>
+                                                    {e.endDay && e.endDay !== e.day && <span style={{fontSize:'10px', fontWeight:700, opacity:0.45, marginLeft:'8px'}}>{e.day}~{e.endDay}일</span>}
+                                                </div>
+                                                {isCalAdmin && <button onClick={()=>onDeleteEvent(e.id)} style={{background:'none',border:'none',cursor:'pointer',fontSize:'16px',color:'#ef4444',opacity:0.5,lineHeight:1,flexShrink:0}}
+                                                    onMouseEnter={ev=>ev.currentTarget.style.opacity='1'} onMouseLeave={ev=>ev.currentTarget.style.opacity='0.5'}>×</button>}
                                             </div>
                                         ))}
                                     </div>
                                 ) : <div style={{fontSize:'11px', opacity:0.3, marginBottom:'10px', fontWeight:700}}>등록된 일정이 없습니다</div>;
                             })()}
-                            <div style={{display:'flex', gap:'8px'}}>
-                                <KorInput autoFocus value={eventText} onChange={e=>setEventText(e.target.value)}
-                                    onKeyDown={e=>{ if(e.key==='Enter') confirmEvent(); if(e.key==='Escape') setAddingDay(null); }}
-                                    placeholder="새 일정 입력 후 추가"
-                                    style={{flex:1, fontSize:'13px', fontWeight:700}} />
-                                <button className="btn-primary" onClick={confirmEvent} disabled={saving||!eventText.trim()} style={{flexShrink:0, padding:'10px 16px', opacity:!eventText.trim()?0.4:1}}>
-                                    {saving?'...':'추가'}
-                                </button>
-                            </div>
+                            {isCalAdmin && (
+                                <div style={{display:'flex', flexDirection:'column', gap:'8px'}}>
+                                    <div style={{display:'flex', gap:'8px'}}>
+                                        <KorInput autoFocus value={eventText} onChange={e=>setEventText(e.target.value)}
+                                            onKeyDown={e=>{ if(e.key==='Enter') confirmEvent(); if(e.key==='Escape') setAddingDay(null); }}
+                                            placeholder="일정 이름 입력"
+                                            style={{flex:1, fontSize:'13px', fontWeight:700}} />
+                                        <button className="btn-primary" onClick={confirmEvent} disabled={saving||!eventText.trim()} style={{flexShrink:0, padding:'10px 16px', opacity:!eventText.trim()?0.4:1}}>
+                                            {saving?'...':'추가'}
+                                        </button>
+                                    </div>
+                                    <div style={{display:'flex', alignItems:'center', gap:'6px'}}>
+                                        <span style={{fontSize:'11px', fontWeight:700, opacity:0.4, whiteSpace:'nowrap'}}>{addingDay}일</span>
+                                        <span style={{fontSize:'11px', opacity:0.3}}>~</span>
+                                        <KorInput type="number" value={eventEndDay} onChange={e=>setEventEndDay(e.target.value)}
+                                            placeholder={`종료일 (선택, ${addingDay+1}~31)`} min={addingDay+1} max={31}
+                                            style={{flex:1, fontSize:'12px', fontWeight:700}} />
+                                        <span style={{fontSize:'11px', fontWeight:700, opacity:0.4}}>일</span>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
                 </>
@@ -2832,14 +2910,36 @@
                     {/* 사이드: 그룹 정보 */}
                     <div style={{display:'flex', flexDirection:'column', gap:'12px'}}>
                         <div className="glass-card" style={{padding:'20px'}}>
-                            <p style={{fontSize:'9px', fontWeight:900, opacity:0.35, textTransform:'uppercase', letterSpacing:'0.2em', marginBottom:'14px', color:'var(--text)'}}>달력 그룹</p>
-                            <div style={{fontSize:'16px', fontWeight:900, color:'var(--text)', marginBottom:'6px'}}>{calendarGroup.name}</div>
-                            <div style={{display:'flex', alignItems:'center', gap:'8px', marginBottom:'16px'}}>
+                            <p style={{fontSize:'9px', fontWeight:900, opacity:0.35, textTransform:'uppercase', letterSpacing:'0.2em', marginBottom:'10px', color:'var(--text)'}}>달력 그룹</p>
+                            <div style={{display:'flex', alignItems:'center', gap:'8px', marginBottom:'6px'}}>
+                                <div style={{fontSize:'16px', fontWeight:900, color:'var(--text)'}}>{calendarGroup.name}</div>
+                                {isCalOwner && <span style={{fontSize:'9px', fontWeight:900, padding:'2px 7px', borderRadius:'99px', background:'rgba(251,191,36,0.15)', color:'#f59e0b', border:'1px solid rgba(251,191,36,0.3)'}}>방장</span>}
+                            </div>
+                            <div style={{display:'flex', alignItems:'center', gap:'8px', marginBottom:'14px'}}>
                                 <span style={{fontSize:'11px', fontWeight:800, color:'var(--accent)', fontFamily:'monospace', letterSpacing:'0.2em', padding:'4px 10px', borderRadius:'8px', background:'rgba(79,110,247,0.1)', border:'1px solid rgba(79,110,247,0.2)'}}>코드: {calendarGroup.code}</span>
                             </div>
-                            <div style={{fontSize:'11px', fontWeight:700, opacity:0.4, marginBottom:'4px'}}>{(calendarGroup.members||[]).length}명 참여 중</div>
+                            {/* 멤버 목록 */}
+                            <p style={{fontSize:'9px', fontWeight:900, opacity:0.35, textTransform:'uppercase', letterSpacing:'0.15em', marginBottom:'8px', color:'var(--text)'}}>멤버 {(calendarGroup.members||[]).length}명</p>
+                            <div style={{display:'flex', flexDirection:'column', gap:'5px', marginBottom:'14px'}}>
+                                {(calendarGroup.members||[]).map(uid => {
+                                    const isOwner = uid === calendarGroup.ownerUid;
+                                    const isMe = uid === currentUser?.uid;
+                                    return (
+                                        <div key={uid} style={{display:'flex', alignItems:'center', gap:'8px', padding:'6px 8px', borderRadius:'10px', background:'var(--glass-bg2)'}}>
+                                            <div style={{width:'6px', height:'6px', borderRadius:'50%', background: isOwner ? '#f59e0b' : 'var(--accent)', flexShrink:0}}></div>
+                                            <span style={{flex:1, fontSize:'11px', fontWeight:700, color:'var(--text)', opacity:0.8}}>{uid.substring(0,8)}…{isMe?' (나)':''}</span>
+                                            {isOwner && <span style={{fontSize:'8px', fontWeight:900, padding:'1px 5px', borderRadius:'99px', background:'rgba(251,191,36,0.15)', color:'#f59e0b'}}>방장</span>}
+                                            {isCalOwner && !isMe && (
+                                                <button onClick={()=>{ if(window.confirm('이 멤버를 내보내시겠습니까?')) onKickMember(uid); }}
+                                                    style={{background:'none', border:'none', cursor:'pointer', fontSize:'11px', fontWeight:800, color:'#ef4444', opacity:0.4, padding:'0 2px', fontFamily:'Pretendard,sans-serif'}}
+                                                    onMouseEnter={e=>e.currentTarget.style.opacity='1'} onMouseLeave={e=>e.currentTarget.style.opacity='0.4'}>내보내기</button>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
                             <button onClick={()=>{ if(window.confirm('그룹에서 나가시겠습니까?')) onLeaveGroup(); }}
-                                style={{marginTop:'12px', width:'100%', padding:'10px', borderRadius:'12px', border:'1px solid rgba(239,68,68,0.3)', background:'rgba(239,68,68,0.06)', cursor:'pointer', fontSize:'12px', fontWeight:800, color:'#ef4444', fontFamily:'Pretendard,sans-serif'}}>
+                                style={{width:'100%', padding:'10px', borderRadius:'12px', border:'1px solid rgba(239,68,68,0.3)', background:'rgba(239,68,68,0.06)', cursor:'pointer', fontSize:'12px', fontWeight:800, color:'#ef4444', fontFamily:'Pretendard,sans-serif'}}>
                                 그룹 나가기
                             </button>
                         </div>
