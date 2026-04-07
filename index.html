@@ -801,6 +801,18 @@
             }, []);
             const isMobileUI = winW < 1100; // 모바일 + 태블릿
 
+            // Android 뒤로 가기 — 초기 history 상태 설정 + popstate 수신
+            useEffect(() => {
+                window.history.replaceState({ view: '대시보드' }, '');
+                const handlePop = (e) => {
+                    const v = e.state?.view || '대시보드';
+                    setView(v);
+                    setShowMore(false);
+                };
+                window.addEventListener('popstate', handlePop);
+                return () => window.removeEventListener('popstate', handlePop);
+            }, []);
+
             // Firebase Auth 상태 감지
             useEffect(() => {
                 const unsub = auth.onAuthStateChanged(async (fbUser) => {
@@ -1410,7 +1422,7 @@
 
             // ── 공통 뷰 렌더러 ──────────────────────────────────────────────
             const renderView = () => (<>
-                {view === '대시보드' && <Dashboard announcements={announcements} todos={todos} resources={resources} posts={posts} studyTime={studyTime} suneungDate={suneungDate} getDDay={getDDay} setView={setView} currentUser={currentUser} />}
+                {view === '대시보드' && <Dashboard announcements={announcements} todos={todos} resources={resources} posts={posts} studyTime={studyTime} suneungDate={suneungDate} getDDay={getDDay} setView={goView} currentUser={currentUser} />}
                 {view === '학습'     && <StudyView currentUser={currentUser} studyGroups={studyGroups} studyTime={studyTime} suneungDate={suneungDate} getDDay={getDDay} todos={todos} selectedDate={selectedDate} setSelectedDate={setSelectedDate} onAddTodo={handleAddTodo} onToggleTodo={handleToggleTodo} onDeleteTodo={handleDeleteTodo} onStudyStart={handleStudyStart} onStudyStop={handleStudyStop} onCreateGroup={handleCreateStudyGroup} onJoinGroup={handleJoinStudyGroup} onLeaveGroup={handleLeaveStudyGroup} onKickMember={handleKickStudyMember} isMobileUI={isMobileUI} />}
                 {view === '플래너'   && <Planner todos={todos} selectedDate={selectedDate} setSelectedDate={setSelectedDate} onAdd={handleAddTodo} onToggle={handleToggleTodo} onDelete={handleDeleteTodo} />}
                 {view === '공지사항' && <NoticeView isAdmin={canManageSystem} announcements={announcements} onAdd={handleAddAnnouncement} />}
@@ -1421,7 +1433,11 @@
                 {view === '설정'     && <SettingsView currentUser={currentUser} userRole={userRole} theme={theme} suneungDate={suneungDate} getDDay={getDDay} onThemeChange={async (t) => { setTheme(t); await saveProfile({ theme: t }); }} onRoleChange={async (r) => { setUserRole(r); await saveProfile({ role: r }); }} onSuneungChange={async (d) => { setSuneungDate(d); await saveProfile({ suneungDate: d }); }} onSchoolChange={async (s) => await saveProfile({ school: s })} onNameChange={async (n) => { await saveProfile({ name: n }); }} />}
             </>);
 
-            const goView = (v) => { setView(v); setShowMore(false); };
+            const goView = (v) => {
+                window.history.pushState({ view: v }, '');
+                setView(v);
+                setShowMore(false);
+            };
             const NAV_PRIMARY = [['대시보드','🏠','홈'],['학습','⏱️','학습'],['플래너','📅','플래너'],['메시지','💬','메시지']];
             const NAV_MORE    = [['공지사항','📢','공지'],['커뮤니티','🔥','커뮤니티'],['공용달력','🗓️','달력'],['자료실','📚','자료실'],['설정','⚙️','설정']];
 
@@ -1509,7 +1525,7 @@
                     {/* ── 사이드바 ─────────────────────────────────────── */}
                     <aside className="sidebar">
                         {/* 로고 */}
-                        <div onClick={()=>setView('대시보드')}
+                        <div onClick={()=>goView('대시보드')}
                             style={{fontSize:'22px', fontWeight:900, letterSpacing:'-0.5px', marginBottom:'24px', paddingLeft:'8px', color:'var(--text)', cursor:'pointer', userSelect:'none', transition:'opacity 0.15s'}}
                             onMouseEnter={e=>e.currentTarget.style.opacity='0.7'}
                             onMouseLeave={e=>e.currentTarget.style.opacity='1'}>
@@ -1538,18 +1554,18 @@
                         <nav style={{flex:1, overflowY:'auto'}}>
                             <div className="nav-label">Individual</div>
                             {[['대시보드','🏠','메인 대시보드'],['학습','⏱️','학습 & 플래너'],['플래너','📅','데일리 플래너']].map(([v,ic,lb],i) => (
-                                <button key={v} className={`nav-item${view===v?' active':''}`} style={{animationDelay:`${i*0.05}s`}} onClick={()=>setView(v)}>
+                                <button key={v} className={`nav-item${view===v?' active':''}`} style={{animationDelay:`${i*0.05}s`}} onClick={()=>goView(v)}>
                                     <span className="icon">{ic}</span>{lb}
                                 </button>
                             ))}
                             <div className="nav-label" style={{marginTop:'20px'}}>Collective</div>
                             {[['공지사항','📢','공지사항'],['커뮤니티','🔥','커뮤니티'],['공용달력','🗓️','공용 달력'],['자료실','📚','학습 자료실'],['메시지','💬','다이렉트 메시지']].map(([v,ic,lb],i) => (
-                                <button key={v} className={`nav-item${view===v?' active':''}`} style={{animationDelay:`${(i+2)*0.05}s`}} onClick={()=>setView(v)}>
+                                <button key={v} className={`nav-item${view===v?' active':''}`} style={{animationDelay:`${(i+2)*0.05}s`}} onClick={()=>goView(v)}>
                                     <span className="icon">{ic}</span>{lb}
                                 </button>
                             ))}
                             <div className="nav-label" style={{marginTop:'20px'}}>Settings</div>
-                            <button className={`nav-item${view==='설정'?' active':''}`} onClick={()=>setView('설정')}>
+                            <button className={`nav-item${view==='설정'?' active':''}`} onClick={()=>goView('설정')}>
                                 <span className="icon">⚙️</span>계정 및 설정
                             </button>
                         </nav>
@@ -2489,6 +2505,15 @@
 
             const isLocalAdmin = currentUser?.uid === 'local-admin';
 
+            // Android 뒤로 가기: detail/write → list
+            useEffect(() => {
+                const handlePop = () => {
+                    if (mode !== 'list') setMode('list');
+                };
+                window.addEventListener('popstate', handlePop);
+                return () => window.removeEventListener('popstate', handlePop);
+            }, [mode]);
+
             // 댓글 로드: 상세 화면 진입 시 onSnapshot 구독 → 실제 count 저장
             useEffect(() => {
                 if (mode !== 'detail' || !selectedPost) return;
@@ -2554,7 +2579,10 @@
                 setCommentLoading(false);
             };
 
-            const openDetail = (post) => { setSelectedPost(post); setComments([]); setCommentInput(''); setMode('detail'); };
+            const openDetail = (post) => {
+                window.history.pushState({ view: '커뮤니티', mode: 'detail' }, '');
+                setSelectedPost(post); setComments([]); setCommentInput(''); setMode('detail');
+            };
 
             const filteredPosts = filterCat === '전체' ? posts : posts.filter(p => p.category === filterCat);
 
@@ -2757,7 +2785,7 @@
                             <h3 style={{fontSize:'18px', fontWeight:900, color:'var(--text)', letterSpacing:'-0.3px'}}>🔥 커뮤니티</h3>
                             <p style={{fontSize:'10px', fontWeight:700, opacity:0.3, textTransform:'uppercase', letterSpacing:'0.15em', marginTop:'3px'}}>{posts.length} Posts</p>
                         </div>
-                        <button className="btn-primary" onClick={()=>setMode('write')}>+ 글 쓰기</button>
+                        <button className="btn-primary" onClick={()=>{ window.history.pushState({ view: '커뮤니티', mode: 'write' }, ''); setMode('write'); }}>+ 글 쓰기</button>
                     </div>
 
                     {/* 카테고리 필터 */}
@@ -3445,7 +3473,17 @@
                 } finally { setSubmitting(false); }
             };
 
-            const openDetail = (r) => { setSelected(r); setMode('detail'); };
+            // Android 뒤로 가기: detail/write → list
+            useEffect(() => {
+                const handlePop = () => { if (mode !== 'list') setMode('list'); };
+                window.addEventListener('popstate', handlePop);
+                return () => window.removeEventListener('popstate', handlePop);
+            }, [mode]);
+
+            const openDetail = (r) => {
+                window.history.pushState({ view: '자료실', mode: 'detail' }, '');
+                setSelected(r); setMode('detail');
+            };
 
             const allSubjects = ['전체', ...RESOURCE_SUBJECTS.filter(s => resources.some(r => r.subject === s))];
             const filtered = filterSub === '전체' ? resources : resources.filter(r => r.subject === filterSub);
@@ -3602,7 +3640,7 @@
                             <h3 style={{fontSize:'18px', fontWeight:900, color:'var(--text)', letterSpacing:'-0.3px'}}>📚 학습 자료실</h3>
                             <p style={{fontSize:'10px', fontWeight:700, opacity:0.3, textTransform:'uppercase', letterSpacing:'0.15em', marginTop:'3px'}}>{resources.length} Posts</p>
                         </div>
-                        <button className="btn-primary" onClick={()=>setMode('write')}>+ 자료 올리기</button>
+                        <button className="btn-primary" onClick={()=>{ window.history.pushState({ view: '자료실', mode: 'write' }, ''); setMode('write'); }}>+ 자료 올리기</button>
                     </div>
 
                     {/* 과목 필터 */}
