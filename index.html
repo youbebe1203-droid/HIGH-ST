@@ -2613,7 +2613,7 @@
                                             <span style={{fontSize:'10px', fontWeight:700, opacity:0.4}}>{p.authorName}</span>
                                             <span style={{fontSize:'10px', fontWeight:700, opacity:0.3}}>{p.date}</span>
                                             <div style={{display:'flex', gap:'10px', marginLeft:'auto', alignItems:'center'}}>
-                                                {(p.commentCount > 0) && <span style={{fontSize:'10px', fontWeight:800, opacity:0.45}}>💬 {p.commentCount}</span>}
+                                                <span style={{fontSize:'10px', fontWeight:800, opacity:0.45}}>💬 {p.commentCount || 0}</span>
                                                 <span onClick={e=>{ e.stopPropagation(); onLike(p.id,'like'); }}
                                                     style={{fontSize:'10px', fontWeight:800, cursor:'pointer', color:(p.likedBy||[]).includes(currentUser?.uid)?'var(--accent)':'var(--text-sub)', opacity:(p.likedBy||[]).includes(currentUser?.uid)?1:0.45, transition:'all 0.15s'}}>
                                                     👍 {p.likes || 0}
