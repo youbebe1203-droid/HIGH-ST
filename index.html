@@ -1165,6 +1165,12 @@
                 }).catch(() => {});
             };
 
+            const handleDeletePost = async (postId) => {
+                if (!currentUser) return;
+                if (isLocalAdmin()) { setPosts(prev => prev.filter(p => p.id !== postId)); return; }
+                await db.collection('posts').doc(postId).delete().catch(() => {});
+            };
+
             // ── 메시지(대화방) 핸들러 ────────────────────────────────────────
             const handleCreateRoom = async (memberIdsStr, groupName) => {
                 const targetIds = memberIdsStr.split(',').map(s => s.trim()).filter(Boolean);
@@ -1255,7 +1261,7 @@
                 {view === '학습'     && <StudyView currentUser={currentUser} studyGroups={studyGroups} studyTime={studyTime} suneungDate={suneungDate} getDDay={getDDay} todos={todos} selectedDate={selectedDate} setSelectedDate={setSelectedDate} onAddTodo={handleAddTodo} onToggleTodo={handleToggleTodo} onDeleteTodo={handleDeleteTodo} onStudyStart={handleStudyStart} onStudyStop={handleStudyStop} onCreateGroup={handleCreateStudyGroup} onJoinGroup={handleJoinStudyGroup} onLeaveGroup={handleLeaveStudyGroup} onKickMember={handleKickStudyMember} isMobileUI={isMobileUI} />}
                 {view === '플래너'   && <Planner todos={todos} selectedDate={selectedDate} setSelectedDate={setSelectedDate} onAdd={handleAddTodo} onToggle={handleToggleTodo} onDelete={handleDeleteTodo} />}
                 {view === '공지사항' && <NoticeView isAdmin={canManageSystem} announcements={announcements} onAdd={handleAddAnnouncement} />}
-                {view === '커뮤니티' && <CommunityView posts={posts} currentUser={currentUser} onAddPost={handleAddPost} onLike={handleLikePost} onReport={handleReportPost} />}
+                {view === '커뮤니티' && <CommunityView posts={posts} currentUser={currentUser} onAddPost={handleAddPost} onLike={handleLikePost} onReport={handleReportPost} onDeletePost={handleDeletePost} userRole={userRole} />}
                 {view === '공용달력' && <CalendarView calendarGroup={calendarGroup} calendarEvents={calendarEvents} onCreateGroup={handleCreateCalendarGroup} onJoinGroup={handleJoinCalendarGroup} onLeaveGroup={handleLeaveCalendarGroup} onAddEvent={handleAddCalendarEvent} onDeleteEvent={handleDeleteCalendarEvent} onKickMember={handleKickCalendarMember} isMobileUI={isMobileUI} currentUser={currentUser} userRole={userRole} />}
                 {view === '자료실'   && <ResourceView resources={resources} currentUser={currentUser} onAdd={handleAddResource} />}
                 {view === '메시지'   && <MessageView rooms={rooms} currentUser={currentUser} localRoomMessages={localRoomMessages} onCreateRoom={handleCreateRoom} onSendInRoom={handleSendInRoom} isMobileUI={isMobileUI} />}
@@ -2309,7 +2315,7 @@
         const CATEGORIES = ['전체','공부','질문','잡담','기타'];
         const CAT_ICON   = { '공부':'📖', '질문':'❓', '잡담':'💬', '기타':'📝' };
 
-        function CommunityView({ posts, currentUser, onAddPost, onLike, onReport }) {
+        function CommunityView({ posts, currentUser, onAddPost, onLike, onReport, onDeletePost, userRole }) {
             const [mode, setMode]                 = useState('list');   // 'list' | 'write' | 'detail'
             const [selectedPost, setSelectedPost] = useState(null);
             const [filterCat, setFilterCat]       = useState('전체');
@@ -2407,11 +2413,22 @@
                 const isLiked     = (livePost.likedBy    || []).includes(uid);
                 const isDisliked  = (livePost.dislikedBy || []).includes(uid);
                 const isReported  = (livePost.reportedBy || []).includes(uid);
+                const canDelete = userRole === '관리자' || livePost.authorId === currentUser?.id;
                 return (
                 <div className="anim-fade-up" style={{maxWidth:'760px', margin:'0 auto'}}>
-                    <button onClick={()=>setMode('list')} style={{background:'none', border:'none', cursor:'pointer', color:'var(--accent)', fontWeight:800, fontSize:'13px', fontFamily:'Pretendard,sans-serif', marginBottom:'16px', padding:'0', display:'flex', alignItems:'center', gap:'6px'}}>
-                        ← 목록으로
-                    </button>
+                    <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'16px'}}>
+                        <button onClick={()=>setMode('list')} style={{background:'none', border:'none', cursor:'pointer', color:'var(--accent)', fontWeight:800, fontSize:'13px', fontFamily:'Pretendard,sans-serif', padding:'0', display:'flex', alignItems:'center', gap:'6px'}}>
+                            ← 목록으로
+                        </button>
+                        {canDelete && (
+                            <button onClick={()=>{ if(window.confirm('이 게시글을 삭제하시겠습니까?')){ onDeletePost(livePost.id); setMode('list'); } }}
+                                style={{background:'none', border:'1.5px solid rgba(239,68,68,0.4)', borderRadius:'10px', cursor:'pointer', fontSize:'11px', fontWeight:800, color:'#ef4444', padding:'6px 14px', fontFamily:'Pretendard,sans-serif', opacity:0.7, transition:'opacity 0.15s'}}
+                                onMouseEnter={e=>e.currentTarget.style.opacity='1'}
+                                onMouseLeave={e=>e.currentTarget.style.opacity='0.7'}>
+                                🗑 삭제
+                            </button>
+                        )}
+                    </div>
 
                     {/* 본문 */}
                     <div className="glass-card-lg" style={{padding:'32px 36px', marginBottom:'16px'}}>
