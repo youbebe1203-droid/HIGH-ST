@@ -713,10 +713,12 @@
 
             // Firestore 데이터 로드
             const loadData = async (uid, profile) => {
-                // 개인 데이터 (1회 읽기)
-                const todosSnap = await db.collection('users').doc(uid)
-                    .collection('todos').orderBy('date').get();
-                setTodos(todosSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+                // 개인 데이터 (1회 읽기) — 실패해도 공용 데이터 로드는 계속
+                try {
+                    const todosSnap = await db.collection('users').doc(uid)
+                        .collection('todos').orderBy('date').get();
+                    setTodos(todosSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+                } catch (e) { console.warn('[todos 로드 실패]', e.code); }
 
                 // studyTime: 날짜가 바뀌면 0 리셋
                 const today = new Date().toISOString().split('T')[0];
